@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.19.3)
-project(FPE)
+project(TFFPE)
 
 # Use C++14 standard to make it compatible with BioDynaMo later on.
 set(CMAKE_CXX_STANDARD 17)

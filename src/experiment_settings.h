@@ -1,158 +1,281 @@
+/*
+    This file implements the three experiments for the Fokker-Planck equation from 
+    
+    H. Mizerová, B. She, A conservative scheme for the Fokker-Planck equation with applications to
+    viscoelastic polymeric fluids, J. Comput. Phys. (2018), https://doi.org/10.1016/j.jcp.2018.08.015
+*/
+
 using namespace std;
 using namespace mfem;
 
 const double alpha = 0.5; 
 
-// this avoids a lot of implicit type casting 
-const double zero(const Vector &x){
-  return 0; 
-}
-
-
-// #define Experiment1 
+#define Experiment1 
 // #define Experiment2 
-#define Experiment3 
+// #define Experiment3 
 
 #if defined(Experiment1)
-  const std::string scenario = "Exp1"; 
-  const int N = 21; 
-  double t_final = 10;
+    const std::string scenario = "Exp1"; 
+    const int N = 21; 
+    double t_final = 10;
 
-  double dt = 0.05;
-  int n_x = 10; 
+    double dt = 0.05;
+    int n_x = 10; 
 
-  const double xi = 1; 
-  const double chi = 1; 
-  const double eps = 1; 
+    const double xi = 1; 
+    const double chi = 1; 
+    const double eps = 1; 
 
-  void u(const Vector &x, Vector &u){
-    u(0) = x(1); 
-    u(1) = 0; 
-  }
+    void u(const Vector &x, Vector &u){
+        u(0) = x(1); 
+        u(1) = 0; 
+    }
 
-  double du1dx1(const Vector &x){
-    return 0; 
-  }
+    double du1dx1(const Vector &x){
+        return 0; 
+    }
 
-  // Here this is not correct. But it is needed to reproduce the results ... a little bit odd. 
-  // Not sure who made a mistake here. 
-  double du1dx2(const Vector &x){
-    return 1;  
-  }
+    double du1dx2(const Vector &x){
+        return 1;  
+    }
 
-  double du2dx1(const Vector &x){
-    return 0;  
-  }    
+    double du2dx1(const Vector &x){
+        return 0;  
+    }    
 
-  double du2dx2(const Vector &x){
-    return 0; 
-  }
+    double du2dx2(const Vector &x){
+        return 0; 
+    }
 #endif
 
 #if defined(Experiment2) 
-  const std::string scenario = "Exp2"; 
-  const int N = 21; 
-  double t_final = 10;
+    const std::string scenario = "Exp2"; 
+    const int N = 21; 
+    double t_final = 10;
 
-  double dt = 0.1;
-  int n_x = 16; 
+    double dt = 0.1;
+    int n_x = 16; 
 
-  const double xi = 1; 
-  const double chi = 1; 
-  const double eps = 0.01; 
+    const double xi = 1; 
+    const double chi = 1; 
+    const double eps = 0.01; 
 
-  void u(const Vector &x, Vector &u){
-    u(0) = x(1) * (1 - x(1)); 
-    u(1) = 0; 
-  }
+    void u(const Vector &x, Vector &u){
+        u(0) = x(1) * (1 - x(1)); 
+        u(1) = 0; 
+    }
 
-  double du1dx1(const Vector &x){
-    return 0; 
-  }
+    double du1dx1(const Vector &x){
+        return 0; 
+    }
 
-  double du1dx2(const Vector &x){
-    return 1 - 2 * x(1);  
-  }
+    double du1dx2(const Vector &x){
+        return 1 - 2 * x(1);  
+    }
 
-  double du2dx1(const Vector &x){
-    return 0;  
-  }    
+    double du2dx1(const Vector &x){
+        return 0;  
+    }    
 
-  double du2dx2(const Vector &x){
-    return 0; 
-  }
+    double du2dx2(const Vector &x){
+        return 0; 
+    }
 #endif
 
+
 #if defined(Experiment3)
-  const std::string scenario = "Exp3";
-  const int N = 10; 
-  double t_final = 15; // reasonable close to steady state
+    const std::string scenario = "Exp3";
+    const int N = 21; 
+    double t_final = 15; 
+    // steady state is reached somewhere between 10s and 15s 
 
-  double dt = 0.05;
-  int n_x = 4; 
+    double dt = 0.05;
+    int n_x = 10; 
 
-  const double kappa = 0.5; 
+    const double kappa = 0.5; 
 
-  const double xi = 1; 
-  const double chi = 1; 
+    const double xi = 1; 
+    const double chi = 1; 
+    // eps is not specified in the paper ... 
+    const double eps = 0.01; 
 
-  // this is not specified in the paper ... 
-  const double eps = 0.01; 
+    void u(const Vector &x, Vector &u){
+        u(0) = kappa * x(0); 
+        u(1) = - kappa * x(1); 
+    }
 
-  void u(const Vector &x, Vector &u){
-    u(0) = kappa * x(0); 
-    u(1) = - kappa * x(1); 
-  }
+    double du1dx1(const Vector &x){
+        return kappa; 
+    }
 
-  double du1dx1(const Vector &x){
-    return kappa; 
-  }
+    double du1dx2(const Vector &x){
+        return 0;  
+    }
 
-  double du1dx2(const Vector &x){
-    return 0;  
-  }
+    double du2dx1(const Vector &x){
+        return 0;  
+    }    
 
-  double du2dx1(const Vector &x){
-    return 0;  
-  }    
-
-  double du2dx2(const Vector &x){
-    return - kappa; 
-  } 
+    double du2dx2(const Vector &x){
+        return - kappa; 
+    } 
 #endif 
+
+// this is not nice but it avoids a lot of implicit type casting 
+const double zero(const Vector &x){
+    return 0; 
+}
 
 // Initial condition
 void phi0_function(const Vector &x, Vector &y){
-  int dim = x.Size(); 
-  int vector_size = y.Size(); 
+    int dim = x.Size(); 
+    int vector_size = y.Size(); 
 
-  for (int i = 0; i < vector_size; i++){
-    y(i) = 0; 
-  }
+    for (int i = 0; i < vector_size; i++){
+        y(i) = 0; 
+    }
 
-  y(0) = 0.07957747154594769;
-  y(2) = -0.042202327319864355;
-  y(4) = 0.027411215668371434;
-  y(6) = -0.018767176437757598;
-  y(8) = 0.0131663145651048;
-  y(20) = -0.042202327319864355;
-  y(22) = 0.02238116387229778;
-  y(24) = -0.014536992359754286;
-  y(26) = 0.009952798292147094;
-  y(28) = -0.0069824927341656075;
-  y(40) = 0.027411215668371434;
-  y(42) = -0.014536992359754286;
-  y(44) = 0.009442053508625628;
-  y(46) = -0.006464532119806319;
-  y(48) = 0.004535262067145761;
-  y(60) = -0.018767176437757598;
-  y(62) = 0.009952798292147094;
-  y(64) = -0.006464532119806319;
-  y(66) = 0.004425962582168262;
-  y(68) = -0.0031050816729665523;
-  y(80) = 0.0131663145651048;
-  y(82) = -0.0069824927341656075;
-  y(84) = 0.004535262067145761;
-  y(86) = -0.0031050816729665523;
-  y(88) = 0.0021784034584109418;
+    // these have to be adjusted if a different N!=21 
+    y(0) = 0.07957747154594769;
+    y(2) = -0.042202327319864355;
+    y(4) = 0.027411215668371434;
+    y(6) = -0.018767176437757598;
+    y(8) = 0.0131663145651048;
+    y(10) = -0.0093679970435956;
+    y(12) = 0.006726880736189749;
+    y(14) = -0.004861638355237339;
+    y(16) = 0.0035304458222095232;
+    y(18) = -0.0025732324695826657;
+    y(20) = 0.0018810575761805332;
+    y(42) = -0.042202327319864355;
+    y(44) = 0.02238116387229778;
+    y(46) = -0.014536992359754286;
+    y(48) = 0.009952798292147094;
+    y(50) = -0.0069824927341656075;
+    y(52) = 0.004968130676746484;
+    y(54) = -0.003567467238594695;
+    y(56) = 0.002578273086498702;
+    y(58) = -0.0018723016361220524;
+    y(60) = 0.0013646625966084816;
+    y(62) = -0.000997581425939689;
+    y(84) = 0.027411215668371434;
+    y(86) = -0.014536992359754286;
+    y(88) = 0.009442053508625628;
+    y(90) = -0.006464532119806319;
+    y(92) = 0.004535262067145761;
+    y(94) = -0.0032268955315374235;
+    y(96) = 0.0023171379418437956;
+    y(98) = -0.001674637493101192;
+    y(100) = 0.0012160955853216496;
+    y(102) = -0.0008863743571930357;
+    y(104) = 0.0006479481429054568;
+    y(126) = -0.018767176437757598;
+    y(128) = 0.009952798292147094;
+    y(130) = -0.006464532119806319;
+    y(132) = 0.004425962582168262;
+    y(134) = -0.0031050816729665523;
+    y(136) = 0.0022093043416695863;
+    y(138) = -0.0015864358994986752;
+    y(140) = 0.0011465459132692808;
+    y(142) = -0.0008326037302038944;
+    y(144) = 0.0006068590372859589;
+    y(146) = -0.00044361976745362444;
+    y(168) = 0.0131663145651048;
+    y(170) = -0.0069824927341656075;
+    y(172) = 0.004535262067145761;
+    y(174) = -0.0031050816729665523;
+    y(176) = 0.0021784034584109418;
+    y(178) = -0.001549961233057453;
+    y(180) = 0.001112981175375484;
+    y(182) = -0.0008043716223111528;
+    y(184) = 0.0005841221057574263;
+    y(186) = -0.0004257484874234121;
+    y(188) = 0.00031122622121471105;
+    y(210) = -0.0093679970435956;
+    y(212) = 0.004968130676746484;
+    y(214) = -0.0032268955315374235;
+    y(216) = 0.0022093043416695863;
+    y(218) = -0.001549961233057453;
+    y(220) = 0.001102816750820539;
+    y(222) = -0.0007918999890925135;
+    y(224) = 0.00057232044263429;
+    y(226) = -0.00041561016431562465;
+    y(228) = 0.0003029253593916452;
+    y(230) = -0.00022144133848632811;
+    y(252) = 0.006726880736189749;
+    y(254) = -0.003567467238594695;
+    y(256) = 0.0023171379418437956;
+    y(258) = -0.0015864358994986752;
+    y(260) = 0.001112981175375484;
+    y(262) = -0.0007918999890925135;
+    y(264) = 0.0005686398871418406;
+    y(266) = -0.00041096632957588153;
+    y(268) = 0.0002984373281811338;
+    y(270) = -0.00021752171303129417;
+    y(272) = 0.0001590104551834931;
+    y(294) = -0.004861638355237339;
+    y(296) = 0.002578273086498702;
+    y(298) = -0.001674637493101192;
+    y(300) = 0.0011465459132692808;
+    y(302) = -0.0008043716223111528;
+    y(304) = 0.00057232044263429;
+    y(306) = -0.00041096632957588153;
+    y(308) = 0.0002970127981946219;
+    y(310) = -0.0002156860539409193;
+    y(312) = 0.0001572068756148139;
+    y(314) = -0.00011491973146556649;
+    y(336) = 0.0035304458222095232;
+    y(338) = -0.0018723016361220524;
+    y(340) = 0.0012160955853216496;
+    y(342) = -0.0008326037302038944;
+    y(344) = 0.0005841221057574263;
+    y(346) = -0.00041561016431562465;
+    y(348) = 0.0002984373281811338;
+    y(350) = -0.0002156860539409193;
+    y(352) = 0.00015662784279794556;
+    y(354) = -0.00011416117709352666;
+    y(356) = 8.345291364689391e-05;
+    y(378) = -0.0025732324695826657;
+    y(380) = 0.0013646625966084816;
+    y(382) = -0.0008863743571930357;
+    y(384) = 0.0006068590372859589;
+    y(386) = -0.0004257484874234121;
+    y(388) = 0.0003029253593916452;
+    y(390) = -0.00021752171303129417;
+    y(392) = 0.0001572068756148139;
+    y(394) = -0.00011416117709352666;
+    y(396) = 8.320854148640875e-05;
+    y(398) = -6.082624061996483e-05;
+    y(420) = 0.0018810575761805332;
+    y(422) = -0.000997581425939689;
+    y(424) = 0.0006479481429054568;
+    y(426) = -0.00044361976745362444;
+    y(428) = 0.00031122622121471105;
+    y(430) = -0.00022144133848632811;
+    y(432) = 0.0001590104551834931;
+    y(434) = -0.00011491973146556649;
+    y(436) = 8.345291364689391e-05;
+    y(438) = -6.082624061996483e-05;
+    y(440) = 4.446456435679963e-05;
+    y(380) = 0.0013646625966084816;
+    y(382) = -0.0008863743571930357;
+    y(384) = 0.0006068590372859589;
+    y(386) = -0.0004257484874234121;
+    y(388) = 0.0003029253593916452;
+    y(390) = -0.00021752171303129417;
+    y(392) = 0.0001572068756148139;
+    y(394) = -0.00011416117709352666;
+    y(396) = 8.320854148640875e-05;
+    y(398) = -6.082624061996483e-05;
+    y(420) = 0.0018810575761805332;
+    y(422) = -0.000997581425939689;
+    y(424) = 0.0006479481429054568;
+    y(426) = -0.00044361976745362444;
+    y(428) = 0.00031122622121471105;
+    y(430) = -0.00022144133848632811;
+    y(432) = 0.0001590104551834931;
+    y(434) = -0.00011491973146556649;
+    y(436) = 8.345291364689391e-05;
+    y(438) = -6.082624061996483e-05;
+    y(440) = 4.446456435679963e-05;
 }
