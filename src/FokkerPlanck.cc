@@ -6,17 +6,13 @@
 #include <algorithm>
 #include <functional> 
 
-#include <experiment_settings.h>
+#include <setting.h>
 #include <finite_difference_scheme.h>
 #include <PhysicalSpaceSolver.h>
 #include <ConfigurationSpaceSolver.h>
 
 using namespace std;
 using namespace mfem;
-
-// Size of the vector phi 
-const int vector_size = N*N;
-const int dim = 2;  
 
 int main(int argc, char *argv[]){    
     // Create a triangulation of the unitsquare (2 * n_x ^ 2 elements) 
@@ -27,24 +23,46 @@ int main(int argc, char *argv[]){
     H1_FECollection fec(1, dim); 
     FiniteElementSpace fespace(mesh, &fec); // scalar 
     FiniteElementSpace vfespace(mesh, &fec, vector_size, Ordering::byNODES); // vector 
+    const int n_dof = fespace.GetVSize(); 
 
     // Create offset vector for phi vector
     // i.e. indices where the next phi_ij starts  
     Array<int> block_offsets(vector_size+1); 
     block_offsets[0]=0; 
     for (int i = 1; i < vector_size + 1; i++){
-        block_offsets[i] =  fespace.GetVSize(); 
+        block_offsets[i] =  n_dof; 
     }
     block_offsets.PartialSum(); 
 
-    // Create blockvetor for all phis 
+    // Create blockvetor phi and phi^0 
     BlockVector phi_block(block_offsets); 
-    phi_block = 1.0; 
+    BlockVector phi0_block(block_offsets);
+    BlockVector F_R_block(block_offsets); 
+    BlockVector F_x_block(block_offsets); 
 
-    // Initial conditions
+    phi_block = 0.; 
+    phi0_block = 0.; 
+    F_R_block = 0.; 
+    F_R_block = 0.; 
+    
+    // Load initial conditions and fill phi^0 
     GridFunction phi(&vfespace, phi_block.GetData());  
-    VectorFunctionCoefficient phi0(vector_size, phi0_function);  
-    phi.ProjectCoefficient(phi0); 
+    GridFunction phi0(&vfespace, phi0_block.GetData());  
+    VectorFunctionCoefficient phi_initial(vector_size, phi0_function);  
+    phi.ProjectCoefficient(phi_initial); 
+    phi0.ProjectCoefficient(phi_initial); 
+
+    // Create vector of blockvectors for modes 
+    std::vector<BlockVector> phi_modes(m,BlockVector(block_offsets)); 
+    for (int i = 0; i < phi_modes.size(); i++){
+        phi_modes[i] = 0.; 
+    }
+
+    // ****************************************************************
+    // Rational Approximation
+
+    std::vector<double> lambda = get_lambdas(); 
+    std::vector<double> weights = get_weights(); 
 
     // ****************************************************************
     // Configuration Space Solver 
@@ -105,15 +123,15 @@ int main(int argc, char *argv[]){
     // ****************************************************************
     // Physical Space Solver 
 
-    BilinearForm q(&fespace); 
+    BilinearForm Fx(&fespace); 
     ConstantCoefficient eps_coeff(-1.0 * eps);
     VectorFunctionCoefficient u_coeff(dim, u, new ConstantCoefficient(-1.0));
-    q.AddDomainIntegrator(new DiffusionIntegrator(eps_coeff)); 
-    q.AddDomainIntegrator(new ConvectionIntegrator(u_coeff)); 
-    q.Assemble(); 
+    Fx.AddDomainIntegrator(new DiffusionIntegrator(eps_coeff)); 
+    Fx.AddDomainIntegrator(new ConvectionIntegrator(u_coeff)); 
+    Fx.Assemble(); 
 
-    SparseMatrix Tmat = m.SpMat();
-    Tmat.Add(-dt, q.SpMat()); 
+    SparseMatrix Id_m_dtFx = m.SpMat();
+    Id_m_dtFx.Add(-dt, Fx.SpMat()); 
 
     // ****************************************************************
     // Output 
@@ -152,7 +170,7 @@ int main(int argc, char *argv[]){
     ode_solver_pss = new BackwardEulerSolver;
 
     // Physical space solver  
-    PSS pss(q, Tmat); 
+    PSS pss(m, Fx, Id_m_dtFx, phi0_block); 
     pss.SetTime(t); 
     ode_solver_pss -> Init(pss); 
 
@@ -162,36 +180,40 @@ int main(int argc, char *argv[]){
     ode_solver_css->Init(css);
 
     // ****************************************************************
-    // Setup of the simulation 
+    // Time loop 
     
     for (int ti = 0; !done; ){
-      cout << "t: " << t << "s / " << t_final << "s - dt: " << dt << endl;  
-      
-      cout << "CSS "; 
-      // apply css to the phi vector 
-      ode_solver_css->Step(phi, t, dt);
-      
-      // advance iteration counter and save output 
-      ti++;
-      pd->SetCycle(ti);
-      pd->SetTime(t);
-      pd->Save();
+        cout << "t: " << t << "s / " << t_final << "s - dt: " << dt << endl;  
+        
+        // configuration space solver 
+        ode_solver_css->Step(phi, t, dt);
+        
+        // advance iteration counter and save output 
+        ti++;
+        pd->SetCycle(ti);
+        pd->SetTime(t);
+        pd->Save();
 
-      cout << "PSS " << endl; 
-      tmp = t; 
-      // apply pss to componentwise 
-      for(int i = 0; i < vector_size; i++){
-          ode_solver_pss -> Step(phi_block.GetBlock(i),t,dt); 
-      }   
-      t = tmp + dt; 
+        // mode update 1 
 
-      // advance iteration counter and save output 
-      ti++;
-      pd->SetCycle(ti);
-      pd->SetTime(t);
-      pd->Save();
 
-      done = (t >= t_final - 1e-8 * dt);
+        // physical space solver 
+        tmp = t; 
+        for(int i = 0; i < vector_size; i++){
+            pss.set_current_block(i); 
+            ode_solver_pss -> Step(phi_block.GetBlock(i),t,dt); 
+        }   
+        t = tmp + dt; 
+
+        // advance iteration counter and save output 
+        ti++;
+        pd->SetCycle(ti);
+        pd->SetTime(t);
+        pd->Save();
+
+        // mode update 2 
+
+        done = (t >= t_final - 1e-8 * dt);
     }
     cout << "t: " << t << "s / " << t_final << "s" << endl;  
     
