@@ -7,6 +7,7 @@
 #include <functional> 
 
 #include <setting.h>
+#include <rational_approximation.h> 
 #include <finite_difference_scheme.h>
 #include <PhysicalSpaceSolver.h>
 #include <ConfigurationSpaceSolver.h>
@@ -53,8 +54,8 @@ int main(int argc, char *argv[]){
     phi0.ProjectCoefficient(phi_initial); 
 
     // Create vector of blockvectors for modes 
-    std::vector<BlockVector> phi_modes(m,BlockVector(block_offsets)); 
-    for (int i = 0; i < phi_modes.size(); i++){
+    std::vector<BlockVector> phi_modes(n_modes,BlockVector(block_offsets)); 
+    for (int i = 0; i < n_modes; i++){
         phi_modes[i] = 0.; 
     }
 
@@ -69,9 +70,19 @@ int main(int argc, char *argv[]){
     double beta = get_beta(dt); 
     double delta = get_delta(dt); 
 
+
+    for (auto i :weights){
+        cout << i << " "; 
+    }
+    cout << endl; 
+
+    for (auto i :gammas){
+        cout << i << " "; 
+    }
+    cout << endl; 
+
     cout << "beta " << beta << endl; 
     cout << "delta " << delta << endl; 
-    
 
     // ****************************************************************
     // Configuration Space Solver 
@@ -88,12 +99,10 @@ int main(int argc, char *argv[]){
   
     // Create blockoprators 
     BlockOperator Id_m_delta_dt_A_BO(block_offsets); 
-    BlockOperator Id_p_delta_A_BO(block_offsets);
     BlockOperator A_BO(block_offsets); 
     
     // The sparse matrices will be stored here 
     std::vector<std::vector<SparseMatrix>> Id_m_delta_dt_A_SpMat(vector_size, std::vector<SparseMatrix>(vector_size)); 
-    std::vector<std::vector<SparseMatrix>> Id_p_delta_A_SpMat(vector_size, std::vector<SparseMatrix>(vector_size)); 
     std::vector<std::vector<SparseMatrix>> A_SpMat(vector_size, std::vector<SparseMatrix>(vector_size)); 
 
     // Create mass matrix 
@@ -118,21 +127,13 @@ int main(int argc, char *argv[]){
                 if(i == j){
                     Id_m_delta_dt_A_SpMat[i][j] = m.SpMat(); 
                     Id_m_delta_dt_A_SpMat[i][j].Add(- delta * dt, a.SpMat());
-                    
-                    Id_p_delta_A_SpMat[i][j] = m.SpMat(); 
-                    Id_p_delta_A_SpMat[i][j].Add(delta, a.SpMat());
-                }
-                else{
+                } else{
                     Id_m_delta_dt_A_SpMat[i][j] = m0.SpMat(); 
                     Id_m_delta_dt_A_SpMat[i][j].Add(- delta * dt, a.SpMat());
-                    
-                    Id_p_delta_A_SpMat[i][j] = m0.SpMat(); 
-                    Id_p_delta_A_SpMat[i][j].Add(delta, a.SpMat());
                 }      
                 A_SpMat[i][j] = a.SpMat(); 
                 // store the block matrices of A
                 Id_m_delta_dt_A_BO.SetBlock(i, j, &Id_m_delta_dt_A_SpMat[i][j]); 
-                Id_p_delta_A_BO.SetBlock(i, j, &Id_p_delta_A_SpMat[i][j]); 
                 A_BO.SetBlock(i, j, &A_SpMat[i][j]); 
             }
         }
@@ -148,8 +149,8 @@ int main(int argc, char *argv[]){
     Fx.AddDomainIntegrator(new ConvectionIntegrator(u_coeff)); 
     Fx.Assemble(); 
 
-    SparseMatrix Id_m_dtFx = m.SpMat();
-    Id_m_dtFx.Add(-dt, Fx.SpMat()); 
+    SparseMatrix Id_m_beta_Fx = m.SpMat();
+    Id_m_beta_Fx.Add(- beta, Fx.SpMat()); 
 
     // ****************************************************************
     // Output 
@@ -162,7 +163,12 @@ int main(int argc, char *argv[]){
 
     // Prepare paraview output and save initial conditions  
     ParaViewDataCollection *pd = NULL;
-    pd = new ParaViewDataCollection(scenario + "_N=" + to_string(N) + "_nx=" + to_string(n_x) + "_dt=" + to_string(dt), mesh);
+    pd = new ParaViewDataCollection(scenario 
+        + "_" + tf_degree
+        + "_N=" + to_string(N) 
+        + "_m=" + to_string(n_modes)
+        + "_nx=" + to_string(n_x) 
+        + "_dt=" + to_string(dt), mesh);
     pd->SetPrefixPath("ParaView");
     for (int i = 0; i < vector_size; i++ ){
         pd->RegisterField("phi " + std::to_string(i), &phis[i]);
@@ -188,12 +194,12 @@ int main(int argc, char *argv[]){
     ode_solver_pss = new BackwardEulerSolver;
 
     // Physical space solver  
-    PSS pss(m, Fx, Id_m_dtFx, phi0_block, phi_modes); 
+    PSS pss(m, Fx, Id_m_beta_Fx, phi0_block, phi_modes); 
     pss.SetTime(t); 
     ode_solver_pss -> Init(pss); 
 
     // Configuration space solver 
-    CSS css(A_BO, Id_p_delta_A_BO, Id_m_delta_dt_A_BO, vector_size);
+    CSS css(A_BO, Id_m_delta_dt_A_BO, vector_size);
     css.SetTime(t);
     ode_solver_css->Init(css);
 
@@ -201,24 +207,19 @@ int main(int argc, char *argv[]){
     // Time loop 
     
     for (int ti = 0; !done; ){
+
         cout << "t: " << t << "s / " << t_final << "s - dt: " << dt << endl;  
         
         // configuration space solver 
         ode_solver_css->Step(phi, t, dt);
         
-        // advance iteration counter and save output 
-        ti++;
-        pd->SetCycle(ti);
-        pd->SetTime(t);
-        pd->Save();
+        // calculate FR 
+        css.Mult(phi_block, F_R_block); 
 
-        // // calculate FR 
-        // css.Mult(phi_block, F_R_block); 
-
-        // // update mode for the configuration space 
-        // for (int l=0; l < phi_modes.size(); l++){
-        //     phi_modes[l].Add(dt * weights[l] , F_x_block); 
-        // }
+        // update mode for the configuration space 
+        for (int l = 0; l < n_modes; l++){
+            phi_modes[l].Add(dt * weights[l], F_R_block); 
+        }
 
         // physical space solver 
         tmp = t; 
@@ -228,22 +229,22 @@ int main(int argc, char *argv[]){
         }   
         t = tmp + dt; 
 
+        // calculate Fx 
+        for(int i= 0; i < vector_size; i++){
+            pss.Mult(phi_block.GetBlock(i), F_x_block.GetBlock(i)); 
+        }
+
+        // update mode for the physical space 
+        for (int l = 0; l < n_modes; l++){
+            phi_modes[l].Add(dt * weights[l], F_x_block); 
+            phi_modes[l] *= gammas[l]; 
+        }
+
         // advance iteration counter and save output 
         ti++;
         pd->SetCycle(ti);
         pd->SetTime(t);
         pd->Save();
-
-        // // calculate Fx 
-        // for(int i= 0; i < vector_size; i++){
-        //     pss.Mult(phi_block.GetBlock(i), F_x_block.GetBlock(i)); 
-        // }
-
-        // // update mode for the physical space 
-        // for (int l=0; l < phi_modes.size(); l++){
-        //     phi_modes[l].Add(dt * weights[l] , F_x_block); 
-        //     phi_modes[l] /= 1 + dt * lambdas[l]; 
-        // }
 
         done = (t >= t_final - 1e-8 * dt);
     }
