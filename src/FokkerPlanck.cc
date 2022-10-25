@@ -137,20 +137,7 @@ int main(int argc, char *argv[]){
                 A_BO.SetBlock(i, j, &A_SpMat[i][j]); 
             }
         }
-    }
-
-    // ****************************************************************
-    // Physical Space Solver 
-
-    BilinearForm Fx(&fespace); 
-    ConstantCoefficient eps_coeff(-1.0 * eps);
-    VectorFunctionCoefficient u_coeff(dim, u, new ConstantCoefficient(-1.0));
-    Fx.AddDomainIntegrator(new DiffusionIntegrator(eps_coeff)); 
-    Fx.AddDomainIntegrator(new ConvectionIntegrator(u_coeff)); 
-    Fx.Assemble(); 
-
-    SparseMatrix Id_m_beta_Fx = m.SpMat();
-    Id_m_beta_Fx.Add(- beta, Fx.SpMat()); 
+    } 
 
     // ****************************************************************
     // Output 
@@ -194,12 +181,12 @@ int main(int argc, char *argv[]){
     ode_solver_pss = new BackwardEulerSolver;
 
     // Physical space solver  
-    PSS pss(m, Fx, Id_m_beta_Fx, phi0_block, phi_modes); 
+    PSS pss(fespace, phi0_block, phi_modes); 
     pss.SetTime(t); 
     ode_solver_pss -> Init(pss); 
 
     // Configuration space solver 
-    CSS css(A_BO, Id_m_delta_dt_A_BO, vector_size);
+    CSS css(fespace, A_BO, Id_m_delta_dt_A_BO, vector_size);
     css.SetTime(t);
     ode_solver_css->Init(css);
 
