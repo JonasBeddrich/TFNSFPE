@@ -10,43 +10,42 @@
 class CSS : public TimeDependentOperator {
 
 private:
-    FiniteElementSpace &fespace; 
-    
-    BlockOperator *my_A; 
-    BlockOperator *my_Id_m; 
 
+    FiniteElementSpace &fespace; 
+
+    BilinearForm* a; 
     BilinearForm* m;
     BilinearForm* m0;
      
     std::vector<CoefficientFactory> *CoefficientVector;
     std::vector<std::vector<FunctionCoefficient>> *A; 
-    std::vector<std::vector<bool>> *A_entries;  
-    
-    std::vector<std::vector<SparseMatrix>> *Id_m_delta_dt_A_SpMat; 
-    std::vector<std::vector<SparseMatrix>> *A_SpMat; 
-    
-    double delta; 
+    std::vector<std::vector<bool>> *A_entries;
 
-    Operator &A_BO, &Id_m_delta_dt_A_BO; 
-
-    int vector_size, N, n_dof; 
+    std::vector<std::vector<SparseMatrix>> *A_SpMat;
+    BlockOperator *A_BO; 
+    
+    std::vector<std::vector<SparseMatrix>> *L_SpMat;
+    BlockOperator *L_BO; 
 
     BiCGSTABSolver css_solver;
     
-    mutable Vector z, tmp;
+    double delta; 
+    int vector_size, N, n_dof; 
+
+    mutable Vector z;
+
 
 public:
 
-    CSS(FiniteElementSpace &fespace_, BlockOperator &A_, BlockOperator &K_, int vector_size_): 
-        TimeDependentOperator(A_.Height()),
+    CSS(FiniteElementSpace &fespace_, int vector_size_, const Array<int> &offsets_): 
+        TimeDependentOperator(fespace_.GetVSize() * vector_size_),
+        z(fespace_.GetVSize() * vector_size_), 
         fespace(fespace_),  
-        A_BO(A_),
-        Id_m_delta_dt_A_BO(K_),
         vector_size(vector_size_),
-        N(sqrt(vector_size)), 
-        n_dof(A_.Height() / (vector_size)), 
-        z(A_.Height()), 
-        tmp(n_dof){
+        n_dof(fespace_.GetVSize()), 
+        N(sqrt(vector_size_)){
+
+        delta = get_delta(dt); 
 
         m = new BilinearForm(&fespace);
         m->AddDomainIntegrator(new MassIntegrator); 
@@ -64,57 +63,78 @@ public:
         A_entries = new std::vector<std::vector<bool>>(vector_size, std::vector<bool>(vector_size)); 
         fill_A(*A, *A_entries, *CoefficientVector); 
 
-        A_SpMat = new std::vector<std::vector<SparseMatrix>>(vector_size, std::vector<SparseMatrix>(vector_size,m0->SpMat())); 
+        A_SpMat = new std::vector<std::vector<SparseMatrix>>(vector_size, std::vector<SparseMatrix>(vector_size,m0->SpMat()));
+        L_SpMat = new std::vector<std::vector<SparseMatrix>>(vector_size, std::vector<SparseMatrix>(vector_size,m0->SpMat()));
 
+        A_BO = new BlockOperator(offsets_); 
+        L_BO = new BlockOperator(offsets_);
 
-        // A_SpMat(vector_size, std::vector<SparseMatrix*>(vector_size)); 
-        // Id_m_delta_dt_A_SpMat = new std::vector<std::vector<SparseMatrix>>(vector_size, std::vector<SparseMatrix>(vector_size)); 
-
-        // Fill the block operators with A and (Id - dt A) 
         for(int i = 0; i < vector_size; i++){
             for(int j = 0; j < vector_size; j++){
-                if(A_entries->at(i)[j]){
+                if((*A_entries)[i][j]){
+                    cout << i << " " << j << endl; 
                     BilinearForm a(&fespace);  
-                    a.AddDomainIntegrator(new MassIntegrator(A->at(i)[j])); 
+                    a.AddDomainIntegrator(new MassIntegrator((*A)[i][j])); 
                     a.Assemble();
 
-                    // store the block matrices of (Id - dt A)
+                    (*A_SpMat)[i][j] = a.SpMat(); 
+
+                    (*L_SpMat)[i][j] = a.SpMat();
+                    (*L_SpMat)[i][j] *= - delta * dt; 
                     if(i == j){
-                        // Id_m_delta_dt_A_SpMat->at(i)[j] = m->SpMat(); 
-                        // Id_m_delta_dt_A_SpMat->at(i)[j].Add(- delta * dt, a.SpMat());
-                    } else{
-                        // Id_m_delta_dt_A_SpMat->at(i)[j] = m0->SpMat(); 
-                        // Id_m_delta_dt_A_SpMat->at(i)[j].Add(- delta * dt, a.SpMat());
+                        (*L_SpMat)[i][j] += m->SpMat();
                     }
-                    // cout << i << " " << j << endl; 
-                    A_SpMat->at(i)[j] = a.SpMat(); 
-                    // store the block matrices of A
-                    // my_Id_m->SetBlock(i, j, &(Id_m_delta_dt_A_SpMat->at(i)[j])); 
-                    // cout << "me" << endl;  
-                    my_A->SetBlock(i, j, A_SpMat->at(i)[j]); 
+
+                    A_BO->SetBlock(i, j, &((*A_SpMat)[i][j])); 
+                    L_BO->SetBlock(i, j, &((*L_SpMat)[i][j])); 
                 }
             }
         } 
+
+        for(int i = 0; i < vector_size; i++){
+            for(int j = 0; j < vector_size; j++){
+                if((*A_entries)[i][j]){
+                    if(i == j){
+                    } else {
+                        cout << endl; 
+                        cout << "A - MATRIX" << endl; 
+                        cout << endl; 
+                        cout << (*A_SpMat)[i][j] << endl; 
+                        cout << endl; 
+                        cout << "L - MATRIX" << endl; 
+                        cout << endl; 
+                        cout << (*L_SpMat)[i][j] << endl; 
+                    }
+                }
+            }
+        } 
+        
+        cout << "Delta times dt" << endl; 
+        cout << - delta * dt << endl; 
+
+        // cout << delta << " " << dt << endl; 
+
+        // SparseMatrix* block = (SparseMatrix *) &(L_BO->GetBlock(13,11)); 
+        // cout << *block << endl; 
 
         css_solver.iterative_mode = false;
         css_solver.SetRelTol(1e-12);
         css_solver.SetMaxIter(1000);
         css_solver.SetPrintLevel(0);
-        css_solver.SetOperator(Id_m_delta_dt_A_BO); 
+        css_solver.SetOperator(*L_BO);
     }
 
-    void Mult(const Vector &u, Vector &k) const{
-        A_BO.Mult(u,k); 
+    void Mult(const Vector &phi, Vector &A_phi) const{
+        A_BO->Mult(phi,A_phi); 
     }
 
     void ImplicitSolve(const double dt, const Vector &phi_old, Vector &dphi_dt){
         // A * phi^n 
-        A_BO.Mult(phi_old,z);
-
+        A_BO->Mult(phi_old,z);
         // calculate phi^n+1
         css_solver.Mult(z,dphi_dt); 
     }
-    
+
     ~CSS(){}
 };
 

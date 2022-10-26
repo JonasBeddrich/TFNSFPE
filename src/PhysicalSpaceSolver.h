@@ -83,8 +83,12 @@ public:
         pss_solver.Mult(z, tmp); 
 
         // calculate update 
-        phi_up = (tmp - phi_old) / dt; 
-        phi_up = 0.; 
+        phi_up = tmp; 
+        phi_up.Add(-1.0, phi_old); 
+        phi_up /= dt; 
+
+        // phi_up = (tmp - phi_old) / dt; 
+        // phi_up = 0.; 
     }
     
     void set_current_block(int i){

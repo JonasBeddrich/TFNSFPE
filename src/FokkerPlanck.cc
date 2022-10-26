@@ -84,8 +84,8 @@ int main(int argc, char *argv[]){
     cout << "beta " << beta << endl; 
     cout << "delta " << delta << endl; 
 
-    // ****************************************************************
-    // Configuration Space Solver 
+    // // ****************************************************************
+    // // Configuration Space Solver 
 
     // Create CoefficientFactory objects for the finite difference scheme 
     std::vector<CoefficientFactory> CoefficientVector(vector_size, CoefficientFactory()); 
@@ -135,9 +135,16 @@ int main(int argc, char *argv[]){
                 // store the block matrices of A
                 Id_m_delta_dt_A_BO.SetBlock(i, j, &Id_m_delta_dt_A_SpMat[i][j]); 
                 A_BO.SetBlock(i, j, &A_SpMat[i][j]); 
+
+                // cout << typeid(&A_SpMat[i][j]).name() << endl; 
             }
         }
     } 
+
+    // cout << delta << " " << dt << endl; 
+
+    // SparseMatrix* block = (SparseMatrix *) &(Id_m_delta_dt_A_BO.GetBlock(13,11)); 
+    // cout << *block << endl; 
 
     // ****************************************************************
     // Output 
@@ -186,7 +193,7 @@ int main(int argc, char *argv[]){
     ode_solver_pss -> Init(pss); 
 
     // Configuration space solver 
-    CSS css(fespace, A_BO, Id_m_delta_dt_A_BO, vector_size);
+    CSS css(fespace, vector_size, block_offsets);
     css.SetTime(t);
     ode_solver_css->Init(css);
 
