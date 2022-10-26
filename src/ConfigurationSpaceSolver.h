@@ -34,7 +34,6 @@ private:
 
     mutable Vector z;
 
-
 public:
 
     CSS(FiniteElementSpace &fespace_, int vector_size_, const Array<int> &offsets_): 
@@ -72,7 +71,7 @@ public:
         for(int i = 0; i < vector_size; i++){
             for(int j = 0; j < vector_size; j++){
                 if((*A_entries)[i][j]){
-                    cout << i << " " << j << endl; 
+                    
                     BilinearForm a(&fespace);  
                     a.AddDomainIntegrator(new MassIntegrator((*A)[i][j])); 
                     a.Assemble();
@@ -90,33 +89,7 @@ public:
                 }
             }
         } 
-
-        for(int i = 0; i < vector_size; i++){
-            for(int j = 0; j < vector_size; j++){
-                if((*A_entries)[i][j]){
-                    if(i == j){
-                    } else {
-                        cout << endl; 
-                        cout << "A - MATRIX" << endl; 
-                        cout << endl; 
-                        cout << (*A_SpMat)[i][j] << endl; 
-                        cout << endl; 
-                        cout << "L - MATRIX" << endl; 
-                        cout << endl; 
-                        cout << (*L_SpMat)[i][j] << endl; 
-                    }
-                }
-            }
-        } 
         
-        cout << "Delta times dt" << endl; 
-        cout << - delta * dt << endl; 
-
-        // cout << delta << " " << dt << endl; 
-
-        // SparseMatrix* block = (SparseMatrix *) &(L_BO->GetBlock(13,11)); 
-        // cout << *block << endl; 
-
         css_solver.iterative_mode = false;
         css_solver.SetRelTol(1e-12);
         css_solver.SetMaxIter(1000);
