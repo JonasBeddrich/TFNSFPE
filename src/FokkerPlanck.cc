@@ -116,21 +116,35 @@ int main(int argc, char *argv[]){
     double tmp = 0.0; 
     bool done = false;
 
+    Vector tmp_vector(n_dof); 
+    BlockVector tmp_block_vector(block_offsets); 
+
     // Define two ODE solvers 
     ODESolver *ode_solver_css = NULL;
     ODESolver *ode_solver_pss = NULL;
     ode_solver_css = new BackwardEulerSolver;
     ode_solver_pss = new BackwardEulerSolver;
 
+    // Configuration space solver 
+    CSS css(fespace, vector_size, block_offsets);
+    css.SetTime(t);
+    ode_solver_css->Init(css);
+
     // Physical space solver  
     PSS pss(fespace, phi0_block, phi_modes); 
     pss.SetTime(t); 
     ode_solver_pss -> Init(pss); 
 
-    // Configuration space solver 
-    CSS css(fespace, vector_size, block_offsets);
-    css.SetTime(t);
-    ode_solver_css->Init(css);
+    BilinearForm m(&fespace);
+    m.AddDomainIntegrator(new MassIntegrator); 
+    m.Assemble(); 
+
+    BiCGSTABSolver m_solver; 
+    m_solver.iterative_mode=false; 
+    m_solver.SetRelTol(1e-12);
+    m_solver.SetMaxIter(1000);
+    m_solver.SetPrintLevel(0);
+    m_solver.SetOperator(m);
 
     // ****************************************************************
     // Time loop 
@@ -140,21 +154,22 @@ int main(int argc, char *argv[]){
         cout << "t: " << t << "s / " << t_final << "s - dt: " << dt << endl;  
         
         // configuration space solver 
-        ode_solver_css->Step(phi, t, dt);
+        ode_solver_css->Step(phi_block, t, dt);
         
         // calculate FR 
         css.Mult(phi_block, F_R_block); 
 
-        // update mode for the configuration space 
-        for (int l = 0; l < n_modes; l++){
-            phi_modes[l].Add(dt * weights[l], F_R_block); 
+        // calculate M^-1 FR 
+        for(int i= 0; i < vector_size; i++){
+            m_solver.Mult(F_R_block.GetBlock(i), tmp_vector);
+            F_R_block.GetBlock(i) = tmp_vector; 
         }
 
-        // advance iteration counter and save output 
-        ti++;
-        pd->SetCycle(ti);
-        pd->SetTime(t);
-        pd->Save();
+        // update modes for the configuration space 
+        for (int l = 0; l < n_modes; l++){
+            F_R_block *= dt * weights[l]; 
+            phi_modes[l] += F_R_block; 
+        }
 
         // physical space solver 
         tmp = t; 
@@ -162,13 +177,14 @@ int main(int argc, char *argv[]){
             pss.set_current_block(i); 
             ode_solver_pss -> Step(phi_block.GetBlock(i),t,dt); 
         }   
-        t = tmp + dt; 
+        t = tmp; 
 
         // calculate Fx 
         for(int i= 0; i < vector_size; i++){
-            pss.Mult(phi_block.GetBlock(i), F_x_block.GetBlock(i)); 
+            pss.Mult(phi_block.GetBlock(i), tmp_vector); 
+            m_solver.Mult(tmp_vector, F_x_block.GetBlock(i)); 
         }
-
+        
         // update mode for the physical space 
         for (int l = 0; l < n_modes; l++){
             phi_modes[l].Add(dt * weights[l], F_x_block); 
@@ -180,6 +196,8 @@ int main(int argc, char *argv[]){
         pd->SetCycle(ti);
         pd->SetTime(t);
         pd->Save();
+
+        // return 0; 
 
         done = (t >= t_final - 1e-8 * dt);
     }

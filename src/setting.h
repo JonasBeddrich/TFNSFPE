@@ -21,7 +21,7 @@ const double alpha = 0.5;
 
 double t_final = 10;
 double dt = 0.25;
-int n_x = 8; 
+int n_x = 4; 
 
 const double xi = 1; 
 const double chi = 1; 
