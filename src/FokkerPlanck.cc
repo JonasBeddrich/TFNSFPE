@@ -185,11 +185,26 @@ int main(int argc, char *argv[]){
             m_solver.Mult(tmp_vector, F_x_block.GetBlock(i)); 
         }
         
-        // update mode for the physical space 
+        // update modes for the physical space 
         for (int l = 0; l < n_modes; l++){
             phi_modes[l].Add(dt * weights[l], F_x_block); 
             phi_modes[l] *= gammas[l]; 
         }
+
+        // int blocknumber = 42; 
+        // for (int i = 0; i < phi_modes[0].GetBlock(blocknumber).Size(); i++){
+        //     cout << phi_modes[0].GetBlock(blocknumber)[i] <<  " ";
+        //     cout << phi_modes[1].GetBlock(blocknumber)[i] <<  " ";
+        //     cout << phi_modes[2].GetBlock(blocknumber)[i] <<  " ";
+        //     cout << phi_modes[3].GetBlock(blocknumber)[i] <<  " ";
+        //     cout << phi_modes[4].GetBlock(blocknumber)[i] <<  " ";
+        //     cout << phi_modes[5].GetBlock(blocknumber)[i] <<  " ";
+        //     cout << phi_modes[6].GetBlock(blocknumber)[i] <<  " ";
+        //     cout << phi_modes[7].GetBlock(blocknumber)[i] <<  " ";
+        //     cout << phi_modes[2].GetBlock(blocknumber)[i] <<  " ";
+        //     cout << phi_modes[8].GetBlock(blocknumber)[i] <<  " ";
+        //     cout << phi_modes[9].GetBlock(blocknumber)[i] << endl; 
+        // }
 
         // advance iteration counter and save output 
         ti++;
@@ -197,10 +212,12 @@ int main(int argc, char *argv[]){
         pd->SetTime(t);
         pd->Save();
 
-        // return 0; 
-
         done = (t >= t_final - 1e-8 * dt);
+        // if(ti >= 20){
+        //     return 0; 
+        // }
     }
+    
     cout << "t: " << t << "s / " << t_final << "s" << endl;  
     
     // Free the used memory.

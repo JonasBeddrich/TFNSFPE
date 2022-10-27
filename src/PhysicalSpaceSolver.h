@@ -56,7 +56,7 @@ public:
         
         // left side operator 
         M_m_beta_Fx = new SparseMatrix(m->SpMat());
-        M_m_beta_Fx->Add(-beta, Fx->SpMat()); 
+        M_m_beta_Fx->Add(- beta, Fx->SpMat()); 
 
         // set up solver 
         pss_solver.iterative_mode = false;
@@ -77,7 +77,6 @@ public:
         for (int l = 0; l < n_modes; l++){    
             m->Mult(phi_modes[l].GetBlock(current_block), tmp);    
             z.Add(gammas[l], tmp); 
-            z.Add(1.0,tmp); 
         }
 
         // solver for phi^n+1
