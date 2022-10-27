@@ -20,8 +20,8 @@ const int vector_size = N*N;
 const double alpha = 0.5; 
 
 double t_final = 10;
-double dt = 0.05;
-int n_x = 4; 
+double dt = 0.25;
+int n_x = 8; 
 
 const double xi = 1; 
 const double chi = 1; 

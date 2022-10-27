@@ -87,7 +87,7 @@ public:
         phi_up.Add(-1.0, phi_old); 
         phi_up /= dt; 
 
-        phi_up = 0.; 
+        // phi_up = 0.; 
     }
     
     void set_current_block(int i){

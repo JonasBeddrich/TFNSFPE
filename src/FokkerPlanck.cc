@@ -150,6 +150,12 @@ int main(int argc, char *argv[]){
             phi_modes[l].Add(dt * weights[l], F_R_block); 
         }
 
+        // advance iteration counter and save output 
+        ti++;
+        pd->SetCycle(ti);
+        pd->SetTime(t);
+        pd->Save();
+
         // physical space solver 
         tmp = t; 
         for(int i = 0; i < vector_size; i++){
