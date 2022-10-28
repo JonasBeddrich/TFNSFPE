@@ -16,6 +16,8 @@ using namespace std;
 using namespace mfem;
 
 int main(int argc, char *argv[]){    
+    Mpi::Init(); 
+
     // Create a triangulation of the unitsquare (2 * n_x ^ 2 elements) 
     Mesh *mesh = new Mesh(); 
     *mesh = Mesh::MakeCartesian2D(n_x, n_x, Element::Type::TRIANGLE);
