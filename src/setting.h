@@ -8,10 +8,10 @@ using namespace mfem;
 const std::string scenario = "Test"; 
 const int dim = 2;
 
-#define alpha_05
+// #define alpha_05
 // #define alpha_07
 // #define alpha_09
-// #define alpha_1
+#define alpha_1
 
 const int n_modes = 10; // number of modes for the rational approximation
 const int N = 10; // degree of Hermite decomposition 
@@ -19,9 +19,9 @@ const int vector_size = N*N;
 
 const double alpha = 0.5; 
 
-double t_final = 10;
-double dt = 0.1;
-int n_x = 16; 
+double t_final = 1;
+double dt = 0.001;
+int n_x = 4; 
 
 const double xi = 1; 
 const double chi = 1; 
@@ -87,4 +87,14 @@ void phi0_function(const Vector &x, Vector &y){
     y(84) = 0.004535262067145761;
     y(86) = -0.0031050816729665523;
     y(88) = 0.0021784034584109418;
+}
+
+void u_BC(const Vector &x, double t, Vector&u){
+    u(0) = 16 * x(0) * x(0) * (1-x(0)) * (1-x(0)); 
+    u(1) = 0; 
+}
+
+void u_IC(const Vector &x, double t, Vector &u){
+   u(0) = 0; 
+   u(1) = 0; 
 }

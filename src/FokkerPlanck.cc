@@ -12,21 +12,32 @@
 #include <PhysicalSpaceSolver.h>
 #include <ConfigurationSpaceSolver.h>
 
+#include <../../mfem-4.5/miniapps/navier/navier_solver.hpp>
+#include <../../mfem-4.5/miniapps/navier/navier_solver.cpp>
+
 using namespace std;
 using namespace mfem;
+using namespace navier; 
 
 int main(int argc, char *argv[]){    
     Mpi::Init(); 
+    Hypre::Init(); 
 
     // Create a triangulation of the unitsquare (2 * n_x ^ 2 elements) 
     Mesh *mesh = new Mesh(); 
     *mesh = Mesh::MakeCartesian2D(n_x, n_x, Element::Type::TRIANGLE);
+    mesh->UniformRefinement(); 
 
     // Define the finite element and the finite element space
     H1_FECollection fec(1, dim); 
     FiniteElementSpace fespace(mesh, &fec); // scalar 
     FiniteElementSpace vfespace(mesh, &fec, vector_size, Ordering::byNODES); // vector 
     const int n_dof = fespace.GetVSize(); 
+
+    // setup navier stokes solver ... needed earlier than the others  ... 
+    auto *pmesh = new ParMesh(MPI_COMM_WORLD, *mesh); 
+    // delete mesh; 
+    NavierSolver flowsolver(pmesh, 2, 1.0 / 100000.0);
 
     // Create offset vector for phi vector
     // i.e. indices where the next phi_ij starts  
@@ -48,6 +59,11 @@ int main(int argc, char *argv[]){
     F_R_block = 0.; 
     F_x_block = 0.; 
     
+    // velocity initial conditions 
+    ParGridFunction *u_ic = flowsolver.GetCurrentVelocity(); 
+    VectorFunctionCoefficient u_IC_coeff(pmesh->Dimension(), u_IC); 
+    u_ic->ProjectCoefficient(u_IC_coeff); 
+
     // Load initial conditions and fill phi^0 
     GridFunction phi(&vfespace, phi_block.GetData());  
     GridFunction phi0(&vfespace, phi0_block.GetData());  
@@ -55,11 +71,22 @@ int main(int argc, char *argv[]){
     phi.ProjectCoefficient(phi_initial); 
     phi0.ProjectCoefficient(phi_initial); 
 
+     // Create references to the single phis 
+    std::vector<GridFunction> phis(vector_size);
+    for (int i = 0; i < vector_size; i++ ){
+        phis[i].MakeRef(&fespace, phi_block.GetBlock(i),0);
+    }
+
     // Create vector of blockvectors for modes 
     std::vector<BlockVector> phi_modes(n_modes,BlockVector(block_offsets)); 
     for (int i = 0; i < n_modes; i++){
         phi_modes[i] = 0.; 
     }
+
+    // velocity boundary conditions  
+    Array<int> attr(pmesh->bdr_attributes.Max());
+    attr = 1;
+    flowsolver.AddVelDirichletBC(u_BC, attr); 
 
     // ****************************************************************
     // Rational Approximation
@@ -72,7 +99,6 @@ int main(int argc, char *argv[]){
     double beta = get_beta(dt); 
     double delta = get_delta(dt); 
 
-
     for (auto i :weights){
         cout << i << " "; 
     }
@@ -82,35 +108,7 @@ int main(int argc, char *argv[]){
         cout << i << " "; 
     }
     cout << endl; 
-
-    // ****************************************************************
-    // Output 
-
-    // Create references to the single phis 
-    std::vector<GridFunction> phis(vector_size);
-    for (int i = 0; i < vector_size; i++ ){
-        phis[i].MakeRef(&fespace, phi_block.GetBlock(i),0);
-    }
-
-    // Prepare paraview output and save initial conditions  
-    ParaViewDataCollection *pd = NULL;
-    pd = new ParaViewDataCollection(scenario 
-        + "_" + tf_degree
-        + "_N=" + to_string(N) 
-        + "_m=" + to_string(n_modes)
-        + "_nx=" + to_string(n_x) 
-        + "_dt=" + to_string(dt), mesh);
-    pd->SetPrefixPath("ParaView");
-    for (int i = 0; i < vector_size; i++ ){
-        pd->RegisterField("phi " + std::to_string(i), &phis[i]);
-    } 
-    pd->SetLevelsOfDetail(1);
-    pd->SetDataFormat(VTKFormat::BINARY);
-    pd->SetHighOrderOutput(true);
-    pd->SetCycle(0);
-    pd->SetTime(0.0);
-    pd->Save();
-    
+   
     // ****************************************************************
     // Setup of the simulation 
 
@@ -127,8 +125,31 @@ int main(int argc, char *argv[]){
     ode_solver_css = new BackwardEulerSolver;
     ode_solver_pss = new BackwardEulerSolver;
 
+    // creating a dummy u to base the FD scheme from a gridfunction 
+    FiniteElementSpace v2dfespace(mesh, &fec, 2, Ordering::byNODES); // vector 
+    cout << "ready to load u" << endl;  
+    ParGridFunction *u_gf_NS = flowsolver.GetCurrentVelocity(); 
+
+    GridFunction u_gf(&v2dfespace); 
+    GridFunction u1_gf(&fespace); 
+    GridFunction u2_gf(&fespace); 
+
+    Vector e1(2); 
+    Vector e2(2);
+    e1[0] = 1.;  
+    e2[1] = 1.; 
+    VectorConstantCoefficient e1_coeff(e1); 
+    VectorConstantCoefficient e2_coeff(e2); 
+
+    VectorGridFunctionCoefficient u_coeff(u_gf_NS);
+    InnerProductCoefficient u1_coeff(u_coeff, e1_coeff); 
+    InnerProductCoefficient u2_coeff(u_coeff, e2_coeff); 
+
+    u1_gf.ProjectCoefficient(u1_coeff); 
+    u2_gf.ProjectCoefficient(u2_coeff); 
+    
     // Configuration space solver 
-    CSS css(fespace, vector_size, block_offsets);
+    CSS css(fespace, vector_size, block_offsets, u1_gf, u2_gf);
     css.SetTime(t);
     ode_solver_css->Init(css);
 
@@ -136,6 +157,9 @@ int main(int argc, char *argv[]){
     PSS pss(fespace, phi0_block, phi_modes); 
     pss.SetTime(t); 
     ode_solver_pss -> Init(pss); 
+
+    // Navier Stokes 
+    flowsolver.Setup(dt); 
 
     BilinearForm m(&fespace);
     m.AddDomainIntegrator(new MassIntegrator); 
@@ -149,6 +173,29 @@ int main(int argc, char *argv[]){
     m_solver.SetOperator(m);
 
     // ****************************************************************
+    // Output 
+
+    // Prepare paraview output and save initial conditions  
+    ParaViewDataCollection *pd = NULL;
+    pd = new ParaViewDataCollection(scenario 
+        + "_" + tf_degree
+        + "_N=" + to_string(N) 
+        + "_m=" + to_string(n_modes)
+        + "_nx=" + to_string(n_x) 
+        + "_dt=" + to_string(dt), mesh);
+    pd->SetPrefixPath("ParaView");
+    for (int i = 0; i < vector_size; i++ ){
+        pd->RegisterField("phi " + std::to_string(i), &phis[i]);
+    } 
+    pd->RegisterField("velocity", u_gf_NS); 
+    pd->SetLevelsOfDetail(1);
+    pd->SetDataFormat(VTKFormat::BINARY);
+    pd->SetHighOrderOutput(true);
+    pd->SetCycle(0);
+    pd->SetTime(0.0);
+    pd->Save();
+
+    // ****************************************************************
     // Time loop 
     
     for (int ti = 0; !done; ){
@@ -156,8 +203,10 @@ int main(int argc, char *argv[]){
         cout << "t: " << t << "s / " << t_final << "s - dt: " << dt << endl;  
         
         // configuration space solver 
+        tmp = t; 
         ode_solver_css->Step(phi_block, t, dt);
-        
+        t = tmp; 
+
         // calculate FR 
         css.Mult(phi_block, F_R_block); 
 
@@ -193,20 +242,7 @@ int main(int argc, char *argv[]){
             phi_modes[l] *= gammas[l]; 
         }
 
-        // int blocknumber = 42; 
-        // for (int i = 0; i < phi_modes[0].GetBlock(blocknumber).Size(); i++){
-        //     cout << phi_modes[0].GetBlock(blocknumber)[i] <<  " ";
-        //     cout << phi_modes[1].GetBlock(blocknumber)[i] <<  " ";
-        //     cout << phi_modes[2].GetBlock(blocknumber)[i] <<  " ";
-        //     cout << phi_modes[3].GetBlock(blocknumber)[i] <<  " ";
-        //     cout << phi_modes[4].GetBlock(blocknumber)[i] <<  " ";
-        //     cout << phi_modes[5].GetBlock(blocknumber)[i] <<  " ";
-        //     cout << phi_modes[6].GetBlock(blocknumber)[i] <<  " ";
-        //     cout << phi_modes[7].GetBlock(blocknumber)[i] <<  " ";
-        //     cout << phi_modes[2].GetBlock(blocknumber)[i] <<  " ";
-        //     cout << phi_modes[8].GetBlock(blocknumber)[i] <<  " ";
-        //     cout << phi_modes[9].GetBlock(blocknumber)[i] << endl; 
-        // }
+        flowsolver.Step(t, dt, ti); 
 
         // advance iteration counter and save output 
         ti++;
@@ -215,9 +251,6 @@ int main(int argc, char *argv[]){
         pd->Save();
 
         done = (t >= t_final - 1e-8 * dt);
-        // if(ti >= 20){
-        //     return 0; 
-        // }
     }
     
     cout << "t: " << t << "s / " << t_final << "s" << endl;  
@@ -227,3 +260,4 @@ int main(int argc, char *argv[]){
     delete pd; 
     return 0;
 }
+

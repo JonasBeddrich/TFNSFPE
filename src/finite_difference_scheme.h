@@ -155,3 +155,56 @@ void fill_A(std::vector<std::vector<FunctionCoefficient>> &A, std::vector<std::v
         }
     } 
 }
+
+void fill_coefficient_matrix(std::vector<std::vector<Coefficient*>> &coeff_matrix, std::vector<std::vector<bool>> &A_entries, 
+        SumCoefficient* A11_coeff, SumCoefficient* A12_coeff, SumCoefficient* A21_coeff, SumCoefficient* A22_coeff){
+    int vector_size = coeff_matrix.size(); 
+    int N = sqrt(vector_size); 
+
+    for(int i = 0; i < vector_size; i++){
+        for(int j = 0; j < vector_size; j++){
+            A_entries[i][j] = false; 
+        }
+    }
+
+    // The iteration starts with 1 since we ignore phi_00
+    // Thus indices are considered -1  
+    for(int i = 0; i < vector_size; i++){
+        int z = i / N; 
+        int k = i % N; 
+
+        // phi z,k 
+        coeff_matrix[i][i] = new SumCoefficient(*A11_coeff, *A22_coeff, (double) -z, (double) -k);  
+        A_entries[i][i] = true; 
+      
+        // phi z-1,k-1 
+        if(z-1 >= 0 && k-1 >=0){
+            coeff_matrix[i][(z-1) * N + k-1] = new SumCoefficient(*A12_coeff, *A21_coeff, -1.0, -sqrt((double) z * k));  
+            A_entries[i][(z-1) * N + k-1] = true; 
+        }
+
+        // phi z-1 k+1 
+        if(z-1 >= 0 && k+1 < N){
+            coeff_matrix[i][(z-1) * N + k+1] = new ProductCoefficient(- sqrt((double) z * (k+1)), *A12_coeff); 
+            A_entries[i][(z-1) * N + k+1] = true; 
+        }
+
+        // phi z+1 k-1 
+        if(z+1 < N && k-1 >= 0){
+            coeff_matrix[i][(z+1) * N + k-1] = new ProductCoefficient(- sqrt((double) (z+1) * k), *A21_coeff);  
+            A_entries[i][(z+1) * N + k-1] = true; 
+        }
+      
+        // phi z-2 k 
+        if(z-2 >= 0){
+            coeff_matrix[i][(z-2) * N + k] = new SumCoefficient(2 * alpha * alpha * chi, *A11_coeff, sqrt((double) z * (z-1)), - sqrt((double) z * (z-1))); 
+            A_entries[i][(z-2) * N + k] = true; 
+        }
+
+        // phi z   k-2
+        if(k-2 >= 0){
+            coeff_matrix[i][(z) * N + k - 2 ] = new SumCoefficient(2 * alpha * alpha * chi, *A22_coeff, sqrt((double) k * (k-1)), - sqrt((double) k * (k-1)));  
+            A_entries[i][(z) * N + k - 2 ] = true; 
+        }
+    } 
+}
