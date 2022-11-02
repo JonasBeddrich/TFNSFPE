@@ -157,7 +157,8 @@ void fill_A(std::vector<std::vector<FunctionCoefficient>> &A, std::vector<std::v
 }
 
 void fill_coefficient_matrix(std::vector<std::vector<Coefficient*>> &coeff_matrix, std::vector<std::vector<bool>> &A_entries, 
-        SumCoefficient* A11_coeff, SumCoefficient* A12_coeff, SumCoefficient* A21_coeff, SumCoefficient* A22_coeff){
+        SumCoefficient* A11_coeff, SumCoefficient* A12_coeff, SumCoefficient* A21_coeff, SumCoefficient* A22_coeff, 
+        ProductCoefficient* alpha_alpha_2_xi_coeff){
     int vector_size = coeff_matrix.size(); 
     int N = sqrt(vector_size); 
 
@@ -197,13 +198,13 @@ void fill_coefficient_matrix(std::vector<std::vector<Coefficient*>> &coeff_matri
       
         // phi z-2 k 
         if(z-2 >= 0){
-            coeff_matrix[i][(z-2) * N + k] = new SumCoefficient(2 * alpha * alpha * chi, *A11_coeff, sqrt((double) z * (z-1)), - sqrt((double) z * (z-1))); 
+            coeff_matrix[i][(z-2) * N + k] = new SumCoefficient(*alpha_alpha_2_xi_coeff, *A11_coeff, sqrt((double) z * (z-1)), - sqrt((double) z * (z-1))); 
             A_entries[i][(z-2) * N + k] = true; 
         }
 
         // phi z   k-2
         if(k-2 >= 0){
-            coeff_matrix[i][(z) * N + k - 2 ] = new SumCoefficient(2 * alpha * alpha * chi, *A22_coeff, sqrt((double) k * (k-1)), - sqrt((double) k * (k-1)));  
+            coeff_matrix[i][(z) * N + k - 2 ] = new SumCoefficient(*alpha_alpha_2_xi_coeff, *A22_coeff, sqrt((double) k * (k-1)), - sqrt((double) k * (k-1)));  
             A_entries[i][(z) * N + k - 2 ] = true; 
         }
     } 

@@ -38,14 +38,17 @@ private:
 
     mutable Vector z, e1, e2;
 
+    ProductCoefficient &chi_xi_coeff; 
+    
     VectorConstantCoefficient *e1_coeff, *e2_coeff; 
     GradientGridFunctionCoefficient *u1_gf_coeff, *u2_gf_coeff;
     InnerProductCoefficient *d1u1_coeff, *d1u2_coeff, *d2u1_coeff, *d2u2_coeff; 
     SumCoefficient *A11_coeff, *A12_coeff, *A21_coeff, *A22_coeff; 
+    ProductCoefficient *alpha_alpha_2_xi_coeff; 
 
 public:
 
-    CSS(FiniteElementSpace &fespace_, int vector_size_, const Array<int> &offsets_, GridFunction &u1_gf, GridFunction &u2_gf): 
+    CSS(FiniteElementSpace &fespace_, int vector_size_, const Array<int> &offsets_, GridFunction &u1_gf, GridFunction &u2_gf, ProductCoefficient &chi_xi_coeff_): 
         TimeDependentOperator(fespace_.GetVSize() * vector_size_),
         z(fespace_.GetVSize() * vector_size_), 
         fespace(fespace_),  
@@ -55,7 +58,8 @@ public:
         u1_gf(u1_gf), 
         u2_gf(u2_gf), 
         e1(2), 
-        e2(2){
+        e2(2), 
+        chi_xi_coeff(chi_xi_coeff_){
 
         setup_coefficients(); 
 
@@ -68,7 +72,7 @@ public:
 
         ConstantCoefficient *ptr_0_coeff = new ConstantCoefficient(0.); 
         coeff_matrix = new std::vector<std::vector<Coefficient*>>(vector_size, std::vector<Coefficient*>(vector_size, ptr_0_coeff)); 
-        fill_coefficient_matrix(*coeff_matrix, *A_entries, A11_coeff, A12_coeff, A21_coeff, A22_coeff); 
+        fill_coefficient_matrix(*coeff_matrix, *A_entries, A11_coeff, A12_coeff, A21_coeff, A22_coeff, alpha_alpha_2_xi_coeff); 
 
         A_SpMat = new std::vector<std::vector<SparseMatrix>>(vector_size, std::vector<SparseMatrix>(vector_size,m0->SpMat()));
         L_SpMat = new std::vector<std::vector<SparseMatrix>>(vector_size, std::vector<SparseMatrix>(vector_size,m0->SpMat()));
@@ -141,10 +145,12 @@ public:
         d1u2_coeff = new InnerProductCoefficient(*u2_gf_coeff, *e1_coeff); 
         d2u2_coeff = new InnerProductCoefficient(*u2_gf_coeff, *e2_coeff); 
 
-        A11_coeff = new SumCoefficient(xi, *d1u1_coeff, 1.0, -1.0); 
+        A11_coeff = new SumCoefficient(chi_xi_coeff, *d1u1_coeff, 1.0, -1.0); 
         A12_coeff = new SumCoefficient(0., *d2u1_coeff, 0.0, -1.0); 
         A21_coeff = new SumCoefficient(0., *d1u2_coeff, 0.0, -1.0); 
-        A22_coeff = new SumCoefficient(xi, *d2u2_coeff, 1.0, -1.0); 
+        A22_coeff = new SumCoefficient(chi_xi_coeff, *d2u2_coeff, 1.0, -1.0); 
+
+        alpha_alpha_2_xi_coeff = new ProductCoefficient(2 * alpha * alpha, chi_xi_coeff); 
     }
 
     ~CSS(){}

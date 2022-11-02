@@ -10,8 +10,8 @@ const int dim = 2;
 
 // #define alpha_05
 // #define alpha_07
-// #define alpha_09
-#define alpha_1
+#define alpha_09
+// #define alpha_1
 
 const int n_modes = 10; // number of modes for the rational approximation
 const int N = 10; // degree of Hermite decomposition 
@@ -19,13 +19,14 @@ const int vector_size = N*N;
 
 const double alpha = 0.5; 
 
-double t_final = 1;
-double dt = 0.001;
-int n_x = 4; 
+double t_final = 2;
+double dt = 0.05;
+int n_x = 16; 
 
-const double xi = 1; 
-const double chi = 1; 
-const double eps = 0.01; 
+const double nu = 0.59; 
+double xi = 1000; 
+double chi = 1000; 
+const double eps = 0.; 
 
 void u(const Vector &x, Vector &u){
     u(0) = x(1) * (1 - x(1)); 

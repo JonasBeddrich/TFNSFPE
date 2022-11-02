@@ -26,18 +26,19 @@ int main(int argc, char *argv[]){
     // Create a triangulation of the unitsquare (2 * n_x ^ 2 elements) 
     Mesh *mesh = new Mesh(); 
     *mesh = Mesh::MakeCartesian2D(n_x, n_x, Element::Type::TRIANGLE);
-    mesh->UniformRefinement(); 
+    
+    // setup navier stokes solver ... needed earlier than the others  ... 
+    auto *pmesh = new ParMesh(MPI_COMM_WORLD, *mesh); 
+    pmesh->UniformRefinement(); 
+    delete mesh; 
 
     // Define the finite element and the finite element space
     H1_FECollection fec(1, dim); 
-    FiniteElementSpace fespace(mesh, &fec); // scalar 
-    FiniteElementSpace vfespace(mesh, &fec, vector_size, Ordering::byNODES); // vector 
+    FiniteElementSpace fespace(pmesh, &fec); // scalar 
+    FiniteElementSpace vfespace(pmesh, &fec, vector_size, Ordering::byNODES); // vector 
     const int n_dof = fespace.GetVSize(); 
 
-    // setup navier stokes solver ... needed earlier than the others  ... 
-    auto *pmesh = new ParMesh(MPI_COMM_WORLD, *mesh); 
-    // delete mesh; 
-    NavierSolver flowsolver(pmesh, 2, 1.0 / 100000.0);
+    NavierSolver flowsolver(pmesh, 2, 0.5 * nu);
 
     // Create offset vector for phi vector
     // i.e. indices where the next phi_ij starts  
@@ -88,6 +89,55 @@ int main(int argc, char *argv[]){
     attr = 1;
     flowsolver.AddVelDirichletBC(u_BC, attr); 
 
+    // All about T 
+    GridFunction *phi00 = &phis[0]; 
+    GridFunction *phi02 = &phis[2]; 
+    GridFunction *phi11 = &phis[1+N]; 
+    GridFunction *phi20 = &phis[2*N]; 
+
+    GradientGridFunctionCoefficient grad_phi00_coeff(phi00); 
+    GradientGridFunctionCoefficient grad_phi02_coeff(phi02); 
+    GradientGridFunctionCoefficient grad_phi11_coeff(phi11); 
+    GradientGridFunctionCoefficient grad_phi20_coeff(phi20); 
+
+    DenseMatrix swap(dim);
+    swap = 0.; 
+    swap.Elem(0,1) = 25.132741228718345;
+    swap.Elem(1,0) = 25.132741228718345;
+    MatrixConstantCoefficient swap_coeff(swap);  
+
+    DenseMatrix elim_c1(dim); 
+    elim_c1 = 0.; 
+    elim_c1.Elem(1,1) = 35.54306350526693;  
+    MatrixConstantCoefficient elim_c1_coeff(elim_c1); 
+    
+    DenseMatrix elim_c2(dim); 
+    elim_c2 = 0.; 
+    elim_c2.Elem(0,0) = 35.54306350526693; 
+    MatrixConstantCoefficient elim_c2_coeff(elim_c2); 
+
+    ScalarVectorProductCoefficient T_1(25.132741228718345, grad_phi00_coeff); 
+    MatrixVectorProductCoefficient T_2(swap_coeff, grad_phi11_coeff); 
+    MatrixVectorProductCoefficient T_3(elim_c1_coeff, grad_phi02_coeff); 
+    MatrixVectorProductCoefficient T_4(elim_c2_coeff, grad_phi20_coeff); 
+
+    VectorSumCoefficient T_12(T_1, T_2); 
+    VectorSumCoefficient T_34(T_3, T_4); 
+    VectorSumCoefficient *T = new VectorSumCoefficient(T_12, T_34); 
+ 
+    Array<int> domain_attr(pmesh->attributes.Max());
+    domain_attr = 1;
+    flowsolver.AddAccelTerm(T, domain_attr);
+
+    // Calculating chi and xi coefficients 
+    GridFunctionCoefficient phi00_coeff(phi00); 
+    GridFunctionCoefficient phi02_coeff(phi02); 
+    GridFunctionCoefficient phi20_coeff(phi20);
+
+    SumCoefficient phi02n20_coeff(phi02_coeff, phi20_coeff); 
+    SumCoefficient trace_C_coeff(phi02n20_coeff, phi00_coeff, 35.54306350526693, 2* 25.132741228718345); 
+    ProductCoefficient chi_xi_coeff(trace_C_coeff, trace_C_coeff); 
+    
     // ****************************************************************
     // Rational Approximation
 
@@ -126,9 +176,10 @@ int main(int argc, char *argv[]){
     ode_solver_pss = new BackwardEulerSolver;
 
     // creating a dummy u to base the FD scheme from a gridfunction 
-    FiniteElementSpace v2dfespace(mesh, &fec, 2, Ordering::byNODES); // vector 
+    FiniteElementSpace v2dfespace(pmesh, &fec, 2, Ordering::byNODES); // vector 
     cout << "ready to load u" << endl;  
     ParGridFunction *u_gf_NS = flowsolver.GetCurrentVelocity(); 
+    ParGridFunction *p_gf_NS = flowsolver.GetCurrentPressure(); 
 
     GridFunction u_gf(&v2dfespace); 
     GridFunction u1_gf(&fespace); 
@@ -149,7 +200,7 @@ int main(int argc, char *argv[]){
     u2_gf.ProjectCoefficient(u2_coeff); 
     
     // Configuration space solver 
-    CSS css(fespace, vector_size, block_offsets, u1_gf, u2_gf);
+    CSS css(fespace, vector_size, block_offsets, u1_gf, u2_gf,chi_xi_coeff);
     css.SetTime(t);
     ode_solver_css->Init(css);
 
@@ -182,12 +233,16 @@ int main(int argc, char *argv[]){
         + "_N=" + to_string(N) 
         + "_m=" + to_string(n_modes)
         + "_nx=" + to_string(n_x) 
-        + "_dt=" + to_string(dt), mesh);
+        + "_dt=" + to_string(dt), pmesh);
     pd->SetPrefixPath("ParaView");
+
+    pd->RegisterField("velocity", u_gf_NS); 
+    pd->RegisterField("pressure", p_gf_NS); 
+
     for (int i = 0; i < vector_size; i++ ){
         pd->RegisterField("phi " + std::to_string(i), &phis[i]);
     } 
-    pd->RegisterField("velocity", u_gf_NS); 
+
     pd->SetLevelsOfDetail(1);
     pd->SetDataFormat(VTKFormat::BINARY);
     pd->SetHighOrderOutput(true);
@@ -199,7 +254,6 @@ int main(int argc, char *argv[]){
     // Time loop 
     
     for (int ti = 0; !done; ){
-
         cout << "t: " << t << "s / " << t_final << "s - dt: " << dt << endl;  
         
         // configuration space solver 
@@ -243,7 +297,7 @@ int main(int argc, char *argv[]){
         }
 
         flowsolver.Step(t, dt, ti); 
-
+ 
         // advance iteration counter and save output 
         ti++;
         pd->SetCycle(ti);
