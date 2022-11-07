@@ -1,32 +1,20 @@
-/*
-    Test setting 
-*/
+// #define alpha_07
+// #define alpha_08
+// #define alpha_09
+#define alpha_1
+
+// #define Experiment4
+// #define Experiment5
+#define Experiment6
 
 using namespace std;
 using namespace mfem;
 
-const std::string scenario = "Test"; 
 const int dim = 2;
-
-// #define alpha_05
-// #define alpha_07
-#define alpha_09
-// #define alpha_1
-
-const int n_modes = 10; // number of modes for the rational approximation
+const int n_modes = 20; // number of modes for the rational approximation
 const int N = 10; // degree of Hermite decomposition 
 const int vector_size = N*N;
-
 const double alpha = 0.5; 
-
-double t_final = 2;
-double dt = 0.05;
-int n_x = 16; 
-
-const double nu = 0.59; 
-double xi = 1000; 
-double chi = 1000; 
-const double eps = 0.; 
 
 void u(const Vector &x, Vector &u){
     u(0) = x(1) * (1 - x(1)); 
@@ -53,6 +41,84 @@ double du2dx2(const Vector &x){
 const double zero(const Vector &x){
     return 0; 
 }
+
+#if defined(alpha_1)
+// double dt = 0.05; 
+/* 
+The original values produces a visible error within the first time steps. 
+Probably this is due to the initial conditions (not given in the paper). 
+*/
+double dt = 0.01;
+int plot_frequency = 1; 
+#endif 
+
+#if defined(alpha_09)
+double dt = 0.005;
+int plot_frequency = 2; 
+#endif 
+
+#if defined(alpha_08)
+double dt = 0.001;
+int plot_frequency = 10; 
+#endif 
+
+#if defined(alpha_07)
+double dt = 0.0001;
+int plot_frequency = 100; 
+#endif 
+
+#if defined(Experiment4)
+const std::string scenario = "Exp4"; 
+double t_final = 2;
+const char *mesh_file = "../src/test.mesh";
+
+// xi and chi are set depening on psi ... thus not defined here 
+const double nu = 0.59; 
+const double eps = 0.; 
+
+void u_BC(const Vector &x, double t, Vector&u){
+    if (x(1) > 0.5){ // top boundary 
+        u(0) = 16 * x(0) * x(0) * (1-x(0)) * (1-x(0)); 
+    } else { // bottom boundary 
+        u(0) = 0; 
+    }
+    u(1) = 0; 
+}
+
+void u_IC(const Vector &x, double t, Vector &u){
+    u(0) = 0; 
+    u(1) = 0; 
+}
+#endif 
+
+#if defined(Experiment5)
+
+#endif 
+
+#if defined(Experiment6)
+const std::string scenario = "Exp6"; 
+double t_final = 4;
+const char *mesh_file = "../src/square-disc.mesh";
+
+// xi and chi are set depening on psi ... thus not defined here 
+const double nu = 0.59; 
+const double eps = 1.; 
+
+void u_BC(const Vector &x, double t, Vector&u){
+    u(0) = 0; 
+    u(1) = 0; 
+    
+    if(x(0) < 1e-8){
+        u(0) = 0.25 * x(1) * (1-x(1)); 
+    } 
+}
+
+void u_IC(const Vector &x, double t, Vector &u){
+    u(0) = 0; 
+    u(1) = 0; 
+}
+
+#endif 
 
 // Initial condition
 void phi0_function(const Vector &x, Vector &y){
@@ -88,14 +154,4 @@ void phi0_function(const Vector &x, Vector &y){
     y(84) = 0.004535262067145761;
     y(86) = -0.0031050816729665523;
     y(88) = 0.0021784034584109418;
-}
-
-void u_BC(const Vector &x, double t, Vector&u){
-    u(0) = 16 * x(0) * x(0) * (1-x(0)) * (1-x(0)); 
-    u(1) = 0; 
-}
-
-void u_IC(const Vector &x, double t, Vector &u){
-   u(0) = 0; 
-   u(1) = 0; 
 }

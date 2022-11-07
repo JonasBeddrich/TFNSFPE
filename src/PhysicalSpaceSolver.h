@@ -12,7 +12,7 @@ private:
     std::vector<double> gammas; 
 
     ConstantCoefficient* eps_coeff; 
-    VectorFunctionCoefficient* u_coeff; 
+    VectorGridFunctionCoefficient &u_coeff; 
 
     FiniteElementSpace &fespace; 
     BilinearForm* m; 
@@ -27,13 +27,14 @@ private:
     mutable Vector z, tmp; 
 
 public: 
-    PSS(FiniteElementSpace &fespace_, BlockVector &phi0_, std::vector<BlockVector> &phi_modes_): 
+    PSS(FiniteElementSpace &fespace_, BlockVector &phi0_, std::vector<BlockVector> &phi_modes_, VectorGridFunctionCoefficient &u_coeff_): 
         TimeDependentOperator(fespace_.GetVSize()), 
         fespace(fespace_),                    
         phi0(phi0_),
         phi_modes(phi_modes_), 
         z(fespace_.GetVSize()), 
-        tmp(fespace_.GetVSize()){
+        tmp(fespace_.GetVSize()),
+        u_coeff(u_coeff_){
         
         // weights for rational approximation 
         beta = get_beta(dt); 
@@ -46,24 +47,8 @@ public:
  
         // coefficients for the physical space operator 
         eps_coeff = new ConstantCoefficient(-1.0 * eps); 
-        u_coeff = new VectorFunctionCoefficient(dim, u, new ConstantCoefficient(-1.0)); 
-
-        // physical space operator        
-        Fx = new BilinearForm(&fespace); 
-        Fx->AddDomainIntegrator(new DiffusionIntegrator(*eps_coeff)); 
-        Fx->AddDomainIntegrator(new ConvectionIntegrator(*u_coeff)); 
-        Fx->Assemble(); 
         
-        // left side operator 
-        M_m_beta_Fx = new SparseMatrix(m->SpMat());
-        M_m_beta_Fx->Add(- beta, Fx->SpMat()); 
-
-        // set up solver 
-        pss_solver.iterative_mode = false;
-        pss_solver.SetRelTol(1e-12);
-        pss_solver.SetMaxIter(1000);
-        pss_solver.SetPrintLevel(0);
-        pss_solver.SetOperator(*M_m_beta_Fx); 
+        calculate_operators(); 
     }
 
     void Mult(const Vector &a, Vector &b) const{
@@ -90,6 +75,27 @@ public:
     
     void set_current_block(int i){
         current_block = i; 
+    }
+
+    void calculate_operators(){
+        // physical space operator        
+        Fx = new BilinearForm(&fespace); 
+        Fx->AddDomainIntegrator(new DiffusionIntegrator(*eps_coeff)); 
+        Fx->AddDomainIntegrator(new ConvectionIntegrator(u_coeff)); 
+        Fx->Assemble(); 
+        
+        // left side operator 
+        M_m_beta_Fx = new SparseMatrix(m->SpMat());
+        M_m_beta_Fx->Add(- beta, Fx->SpMat()); 
+
+        // cout <<  *M_m_beta_Fx << endl; 
+
+        // set up solver 
+        pss_solver.iterative_mode = false;
+        pss_solver.SetRelTol(1e-12);
+        pss_solver.SetMaxIter(1000);
+        pss_solver.SetPrintLevel(0);
+        pss_solver.SetOperator(*M_m_beta_Fx); 
     }
 
     ~PSS(){}
