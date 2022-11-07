@@ -31,8 +31,9 @@ int main(int argc, char *argv[]){
     
     // setup navier stokes solver ... needed earlier than the others  ... 
     auto *pmesh = new ParMesh(MPI_COMM_WORLD, *mesh); 
-    pmesh->UniformRefinement(); 
-    pmesh->UniformRefinement(); 
+    for (int i = 0; i < n_refine; i++){
+        pmesh->UniformRefinement(); 
+    }
     delete mesh; 
 
     // Define the finite element and the finite element space
@@ -136,6 +137,7 @@ int main(int argc, char *argv[]){
     // Calculating chi and xi coefficients 
     GridFunctionCoefficient phi00_coeff(phi00); 
     GridFunctionCoefficient phi02_coeff(phi02); 
+    GridFunctionCoefficient phi11_coeff(phi11); 
     GridFunctionCoefficient phi20_coeff(phi20);
 
     SumCoefficient phi02n20_coeff(phi02_coeff, phi20_coeff); 
@@ -148,6 +150,18 @@ int main(int argc, char *argv[]){
     GridFunction *T_gf = new GridFunction(&v2dfespace); 
     T_gf->ProjectCoefficient(*T); 
     
+    GridFunction *C11_gf = new GridFunction(&fespace); 
+    SumCoefficient *C11_coeff = new SumCoefficient(phi00_coeff, phi20_coeff, 25.132741228718345, 35.54306350526693);  
+    C11_gf->ProjectCoefficient(*C11_coeff); 
+
+    GridFunction *C12_gf = new GridFunction(&fespace); 
+    ProductCoefficient *C12_coeff = new ProductCoefficient(25.132741228718345, phi11_coeff);  
+    C12_gf->ProjectCoefficient(*C12_coeff); 
+
+    GridFunction *C22_gf = new GridFunction(&fespace); 
+    SumCoefficient *C22_coeff = new SumCoefficient(phi00_coeff, phi02_coeff, 25.132741228718345, 35.54306350526693);  
+    C22_gf->ProjectCoefficient(*C22_coeff);     
+
     // ****************************************************************
     // Rational Approximation
 
@@ -243,6 +257,9 @@ int main(int argc, char *argv[]){
     pd->RegisterField("_chi", chi_gf); 
     pd->RegisterField("_T", T_gf); 
 
+    pd->RegisterField("_C11", C11_gf);  
+    pd->RegisterField("_C12", C12_gf);  
+    pd->RegisterField("_C22", C22_gf);  
 
     for (int i = 0; i < vector_size; i++ ){
         pd->RegisterField("phi " + std::to_string(i), &phis[i]);
@@ -311,6 +328,10 @@ int main(int argc, char *argv[]){
         div_u_gf->ProjectCoefficient(div_u_coeff); 
         T_gf->ProjectCoefficient(*T); 
         chi_gf->ProjectCoefficient(chi_xi_coeff); 
+        C11_gf->ProjectCoefficient(*C11_coeff); 
+        C12_gf->ProjectCoefficient(*C12_coeff);  
+        C22_gf->ProjectCoefficient(*C22_coeff); 
+    
     
         // advance iteration counter and save output 
         ti++;

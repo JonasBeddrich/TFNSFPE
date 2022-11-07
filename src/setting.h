@@ -26,7 +26,7 @@ const double alpha = 0.5;
 The original values produces a visible error within the first time steps. 
 Probably this is due to the initial conditions (not given in the paper). 
 */
-double dt = 0.001;
+double dt = 0.01;
 int plot_frequency = 1; 
 #endif 
 
@@ -51,6 +51,7 @@ int plot_frequency = 100;
 const std::string scenario = "Exp4"; 
 double t_final = 2;
 const char *mesh_file = "../src/test.mesh";
+const int n_refine = 3; 
 
 // xi and chi are set depening on psi ... thus not defined here 
 const double nu = 0.59; 
@@ -72,13 +73,13 @@ void u_IC(const Vector &x, double t, Vector &u){
 #endif 
 
 #if defined(Experiment5)
-
 #endif 
 
 #if defined(Experiment6)
 const std::string scenario = "Exp6"; 
 double t_final = 4;
 const char *mesh_file = "../src/square-disc.mesh";
+const int n_refine = 0; 
 
 // xi and chi are set depening on psi ... thus not defined here 
 const double nu = 0.59; 
