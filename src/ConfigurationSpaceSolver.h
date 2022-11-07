@@ -11,41 +11,32 @@ class CSS : public TimeDependentOperator {
 
 private:
 
-    FiniteElementSpace &fespace; 
-
-    BilinearForm* a; 
-    BilinearForm* m;
-    BilinearForm* m0;
-
-    ParGridFunction *dxu1_gf, *dyu1_gf, *dxu2_gf, *dyu2_gf;
-    
-    // std::vector<CoefficientFactory> *CoefficientVector;
-    std::vector<std::vector<FunctionCoefficient>> *A; 
-    std::vector<std::vector<bool>> *A_entries;
-
-    std::vector<std::vector<Coefficient*>> *coeff_matrix; 
-    
-    std::vector<std::vector<SparseMatrix>> *A_SpMat;
-    BlockOperator *A_BO; 
-    
-    std::vector<std::vector<SparseMatrix>> *L_SpMat;
-    BlockOperator *L_BO; 
-
-    BiCGSTABSolver css_solver;
-    
     double delta; 
     int vector_size, N, n_dof; 
 
-    mutable Vector z, e1, e2;
+    FiniteElementSpace &fespace; 
+
+    BilinearForm* m;
+    BilinearForm* m0;
+
+    ParGridFunction *u_gf_NS; 
+    ParGridFunction *dxu1_gf, *dyu1_gf, *dxu2_gf, *dyu2_gf;
+    
+    std::vector<std::vector<bool>> *A_entries;
+    std::vector<std::vector<Coefficient*>> *coeff_matrix; 
+    std::vector<std::vector<SparseMatrix>> *A_SpMat;
+    std::vector<std::vector<SparseMatrix>> *L_SpMat;
+    
+    BlockOperator *A_BO; 
+    BlockOperator *L_BO; 
 
     ProductCoefficient &chi_xi_coeff; 
-    
-    VectorConstantCoefficient *e1_coeff, *e2_coeff; 
-    
-    ParGridFunction *u_gf_NS; 
     GridFunctionCoefficient *d1u1_coeff, *d1u2_coeff, *d2u1_coeff, *d2u2_coeff; 
     SumCoefficient *A11_coeff, *A12_coeff, *A21_coeff, *A22_coeff; 
     ProductCoefficient *alpha_alpha_2_xi_coeff; 
+
+    BiCGSTABSolver css_solver;
+    mutable Vector z;
 
 public:
 
@@ -57,13 +48,12 @@ public:
         n_dof(fespace_.GetVSize()), 
         N(sqrt(vector_size_)), 
         u_gf_NS(u_gf_NS_), 
-        e1(2), 
-        e2(2), 
         chi_xi_coeff(chi_xi_coeff_){
 
         setup_coefficients(); 
 
         A_entries = new std::vector<std::vector<bool>>(vector_size, std::vector<bool>(vector_size)); 
+        fill_A_entries(*A_entries); 
 
         ConstantCoefficient *ptr_0_coeff = new ConstantCoefficient(0.); 
         coeff_matrix = new std::vector<std::vector<Coefficient*>>(vector_size, std::vector<Coefficient*>(vector_size, ptr_0_coeff)); 
@@ -113,9 +103,9 @@ public:
         u_gf_NS->GetDerivative(2,1,*dyu2_gf); 
 
         d1u1_coeff = new GridFunctionCoefficient(dxu1_gf); 
-        d2u1_coeff = new GridFunctionCoefficient(dxu1_gf); 
-        d1u2_coeff = new GridFunctionCoefficient(dxu1_gf); 
-        d2u2_coeff = new GridFunctionCoefficient(dxu1_gf); 
+        d2u1_coeff = new GridFunctionCoefficient(dyu1_gf); 
+        d1u2_coeff = new GridFunctionCoefficient(dxu2_gf); 
+        d2u2_coeff = new GridFunctionCoefficient(dyu1_gf); 
 
         A11_coeff = new SumCoefficient(chi_xi_coeff, *d1u1_coeff, 1.0, -1.0); 
         A12_coeff = new SumCoefficient(0., *d2u1_coeff, 0.0, -1.0); 
@@ -127,7 +117,7 @@ public:
 
     void calculate_operators(){
 
-        fill_coefficient_matrix(*coeff_matrix, *A_entries, A11_coeff, A12_coeff, A21_coeff, A22_coeff, alpha_alpha_2_xi_coeff); 
+        fill_coefficient_matrix(*coeff_matrix, A11_coeff, A12_coeff, A21_coeff, A22_coeff, alpha_alpha_2_xi_coeff); 
         
         u_gf_NS->GetDerivative(1,0,*dxu1_gf); 
         u_gf_NS->GetDerivative(1,1,*dyu1_gf); 

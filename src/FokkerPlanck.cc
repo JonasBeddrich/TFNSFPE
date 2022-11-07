@@ -31,8 +31,8 @@ int main(int argc, char *argv[]){
     
     // setup navier stokes solver ... needed earlier than the others  ... 
     auto *pmesh = new ParMesh(MPI_COMM_WORLD, *mesh); 
-    // pmesh->UniformRefinement(); 
-    // pmesh->UniformRefinement(); 
+    pmesh->UniformRefinement(); 
+    pmesh->UniformRefinement(); 
     delete mesh; 
 
     // Define the finite element and the finite element space
@@ -315,7 +315,6 @@ int main(int argc, char *argv[]){
         // advance iteration counter and save output 
         ti++;
         if(ti % plot_frequency == 0){
-            cout << ti << endl; 
             pd->SetCycle(ti);
             pd->SetTime(t);
             pd->Save();
