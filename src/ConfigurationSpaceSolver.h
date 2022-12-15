@@ -15,6 +15,8 @@ private:
     int vector_size, N, n_dof; 
 
     FiniteElementSpace &fespace; 
+    const FiniteElementCollection *u_fec; 
+    ParFiniteElementSpace *u_fes; 
 
     BilinearForm* m;
     BilinearForm* m0;
@@ -30,17 +32,17 @@ private:
     BlockOperator *A_BO; 
     BlockOperator *L_BO; 
 
-    ProductCoefficient &chi_xi_coeff; 
+    ProductCoefficient &chi_coeff, &xi_coeff; 
     GridFunctionCoefficient *d1u1_coeff, *d1u2_coeff, *d2u1_coeff, *d2u2_coeff; 
     SumCoefficient *A11_coeff, *A12_coeff, *A21_coeff, *A22_coeff; 
-    ProductCoefficient *alpha_alpha_2_xi_coeff; 
+    ProductCoefficient *alpha_alpha_2_chi_coeff; 
 
     BiCGSTABSolver css_solver;
     mutable Vector z;
 
 public:
 
-    CSS(FiniteElementSpace &fespace_, int vector_size_, const Array<int> &offsets_, ParGridFunction *u_gf_NS_, ProductCoefficient &chi_xi_coeff_): 
+    CSS(FiniteElementSpace &fespace_, int vector_size_, const Array<int> &offsets_, ParGridFunction *u_gf_NS_, ProductCoefficient &chi_coeff_, ProductCoefficient &xi_coeff_): 
         TimeDependentOperator(fespace_.GetVSize() * vector_size_),
         z(fespace_.GetVSize() * vector_size_), 
         fespace(fespace_),  
@@ -48,7 +50,8 @@ public:
         n_dof(fespace_.GetVSize()), 
         N(sqrt(vector_size_)), 
         u_gf_NS(u_gf_NS_), 
-        chi_xi_coeff(chi_xi_coeff_){
+        chi_coeff(chi_coeff_), 
+        xi_coeff(xi_coeff_){
 
         setup_coefficients(); 
 
@@ -63,7 +66,7 @@ public:
 
         A_BO = new BlockOperator(offsets_); 
         L_BO = new BlockOperator(offsets_);
-        
+
         calculate_operators(); 
     }
 
@@ -92,10 +95,13 @@ public:
         m0->AddDomainIntegrator(new MassIntegrator(m0_coef)); 
         m0->Assemble(); 
 
-        dxu1_gf = new ParGridFunction(u_gf_NS->ParFESpace()); 
-        dyu1_gf = new ParGridFunction(u_gf_NS->ParFESpace()); 
-        dxu2_gf = new ParGridFunction(u_gf_NS->ParFESpace()); 
-        dyu2_gf = new ParGridFunction(u_gf_NS->ParFESpace()); 
+        u_fec = u_gf_NS->ParFESpace()->FEColl(); 
+        u_fes = new ParFiniteElementSpace(u_gf_NS->ParFESpace()->GetParMesh(), u_fec, 1); 
+
+        dxu1_gf = new ParGridFunction(u_fes); 
+        dyu1_gf = new ParGridFunction(u_fes); 
+        dxu2_gf = new ParGridFunction(u_fes); 
+        dyu2_gf = new ParGridFunction(u_fes); 
         
         u_gf_NS->GetDerivative(1,0,*dxu1_gf); 
         u_gf_NS->GetDerivative(1,1,*dyu1_gf); 
@@ -105,19 +111,19 @@ public:
         d1u1_coeff = new GridFunctionCoefficient(dxu1_gf); 
         d2u1_coeff = new GridFunctionCoefficient(dyu1_gf); 
         d1u2_coeff = new GridFunctionCoefficient(dxu2_gf); 
-        d2u2_coeff = new GridFunctionCoefficient(dyu1_gf); 
+        d2u2_coeff = new GridFunctionCoefficient(dyu2_gf); 
 
-        A11_coeff = new SumCoefficient(chi_xi_coeff, *d1u1_coeff, 1.0, -1.0); 
+        A11_coeff = new SumCoefficient(xi_coeff, *d1u1_coeff, 1.0, -1.0); 
         A12_coeff = new SumCoefficient(0., *d2u1_coeff, 0.0, -1.0); 
         A21_coeff = new SumCoefficient(0., *d1u2_coeff, 0.0, -1.0); 
-        A22_coeff = new SumCoefficient(chi_xi_coeff, *d2u2_coeff, 1.0, -1.0); 
+        A22_coeff = new SumCoefficient(xi_coeff, *d2u2_coeff, 1.0, -1.0); 
 
-        alpha_alpha_2_xi_coeff = new ProductCoefficient(2 * alpha * alpha, chi_xi_coeff); 
+        alpha_alpha_2_chi_coeff = new ProductCoefficient(2 * alpha * alpha, chi_coeff); 
     }
 
     void calculate_operators(){
 
-        fill_coefficient_matrix(*coeff_matrix, A11_coeff, A12_coeff, A21_coeff, A22_coeff, alpha_alpha_2_xi_coeff); 
+        fill_coefficient_matrix(*coeff_matrix, A11_coeff, A12_coeff, A21_coeff, A22_coeff, alpha_alpha_2_chi_coeff); 
         
         u_gf_NS->GetDerivative(1,0,*dxu1_gf); 
         u_gf_NS->GetDerivative(1,1,*dyu1_gf); 
@@ -126,8 +132,8 @@ public:
 
         for(int i = 0; i < vector_size; i++){
             for(int j = 0; j < vector_size; j++){
-                
                 if((*A_entries)[i][j]){
+
                     BilinearForm a(&fespace);  
                     a.AddDomainIntegrator(new MassIntegrator(*((*coeff_matrix)[i][j]))); 
                     a.Assemble();
@@ -147,8 +153,8 @@ public:
         }
 
         css_solver.iterative_mode = false;
-        css_solver.SetRelTol(1e-8);
-        css_solver.SetMaxIter(20000);
+        css_solver.SetRelTol(1e-12);
+        css_solver.SetMaxIter(2000);
         css_solver.SetPrintLevel(0);
         css_solver.SetOperator(*L_BO); 
     }

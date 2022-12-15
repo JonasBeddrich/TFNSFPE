@@ -46,6 +46,7 @@ public:
         m->Assemble(); 
  
         // coefficients for the physical space operator 
+        // eps_coeff = new ConstantCoefficient(eps); 
         eps_coeff = new ConstantCoefficient(-1.0 * eps); 
         
         calculate_operators(); 
@@ -87,8 +88,6 @@ public:
         // left side operator 
         M_m_beta_Fx = new SparseMatrix(m->SpMat());
         M_m_beta_Fx->Add(- beta, Fx->SpMat()); 
-
-        // cout <<  *M_m_beta_Fx << endl; 
 
         // set up solver 
         pss_solver.iterative_mode = false;
