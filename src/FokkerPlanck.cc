@@ -166,7 +166,7 @@ int main(int argc, char *argv[]){
     VectorSumCoefficient T_34(T_3, T_4);
 
     #if !defined(Experiment5_pres_C)
-    VectorSumCoefficient *T = new VectorSumCoefficient(T_12, T_34);
+    VectorCoefficient *T = new VectorSumCoefficient(T_12, T_34);
     #endif 
 
     #if defined(Experiment5_pres_C)
@@ -326,7 +326,7 @@ int main(int argc, char *argv[]){
     
 
     // Configuration space solver
-    CSS css(fespace, vector_size, block_offsets, u_gf_NS, chi_coeff, xi_coeff);
+    CSS css(fespace, phi0_block, phi_modes, vector_size, block_offsets, u_gf_NS, chi_coeff, xi_coeff);
     css.SetTime(t);
     ode_solver_css->Init(css);
 
@@ -390,6 +390,9 @@ int main(int argc, char *argv[]){
     // ****************************************************************
     // Time loop
 
+    cout << "delta" << endl; 
+    cout << delta << endl; 
+
     for (int ti = 0; !done; ){
         cout << "t: " << t << "s / " << t_final << "s - dt: " << dt << endl;
 
@@ -412,11 +415,7 @@ int main(int argc, char *argv[]){
 
         // update modes for the configuration space
         for (int l = 0; l < n_modes; l++){
-            // ***********************
-            // TODO: This looks wrong to me, should all the weights get multiplied????  
-            // ***********************
-            F_R_block *= dt * weights[l];
-            phi_modes[l] += F_R_block;
+            phi_modes[l].Add(dt * weights[l], F_R_block);
         }
 
         // physical space solver

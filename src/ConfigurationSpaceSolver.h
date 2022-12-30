@@ -11,7 +11,7 @@ class CSS : public TimeDependentOperator {
 
 private:
 
-    double delta; 
+    double theta; 
     int vector_size, N, n_dof; 
 
     FiniteElementSpace &fespace; 
@@ -23,6 +23,9 @@ private:
 
     ParGridFunction *u_gf_NS; 
     ParGridFunction *dxu1_gf, *dyu1_gf, *dxu2_gf, *dyu2_gf;
+    
+    BlockVector &phi0; 
+    std::vector<BlockVector> & phi_modes; 
     
     std::vector<std::vector<bool>> *A_entries;
     std::vector<std::vector<Coefficient*>> *coeff_matrix; 
@@ -42,10 +45,12 @@ private:
 
 public:
 
-    CSS(FiniteElementSpace &fespace_, int vector_size_, const Array<int> &offsets_, ParGridFunction *u_gf_NS_, ProductCoefficient &chi_coeff_, ProductCoefficient &xi_coeff_): 
+    CSS(FiniteElementSpace &fespace_, BlockVector &phi0_, std::vector<BlockVector> &phi_modes_, int vector_size_, const Array<int> &offsets_, ParGridFunction *u_gf_NS_, ProductCoefficient &chi_coeff_, ProductCoefficient &xi_coeff_): 
         TimeDependentOperator(fespace_.GetVSize() * vector_size_),
         z(fespace_.GetVSize() * vector_size_), 
         fespace(fespace_),  
+        phi0(phi0_),
+        phi_modes(phi_modes_), 
         vector_size(vector_size_),
         n_dof(fespace_.GetVSize()), 
         N(sqrt(vector_size_)), 
@@ -84,7 +89,7 @@ public:
 
     void setup_coefficients(){
 
-        delta = get_delta(dt); 
+        theta = get_theta(dt); 
         
         m = new BilinearForm(&fespace);
         m->AddDomainIntegrator(new MassIntegrator); 
@@ -141,7 +146,8 @@ public:
                     (*A_SpMat)[i][j] = a.SpMat(); 
 
                     (*L_SpMat)[i][j] = a.SpMat();
-                    (*L_SpMat)[i][j] *= - delta * dt; 
+                    (*L_SpMat)[i][j] *= - theta * dt; 
+
                     if(i == j){
                         (*L_SpMat)[i][j] += m->SpMat();
                     }

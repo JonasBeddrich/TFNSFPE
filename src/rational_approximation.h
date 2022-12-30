@@ -208,6 +208,13 @@ double get_beta(double dt){
     return beta + get_w_infinity(); 
 }
 
+double get_theta(double dt){
+    double theta = 0; 
+    std::vector<double> weights = get_weights(); 
+    std::for_each(weights.begin(), weights.end(), [&] (double d) {theta += d;}); 
+    return theta * dt + get_w_infinity(); 
+}
+
 double get_delta(double dt){
     double delta = 0; 
     std::vector<double> weights = get_weights(); 
