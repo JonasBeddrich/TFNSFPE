@@ -74,9 +74,9 @@ int main(int argc, char *argv[]){
 
     // Define the finite element and the finite element space
     H1_FECollection fec(1, dim);
-    FiniteElementSpace fespace(pmesh, &fec); // scalar
-    FiniteElementSpace vfespace(pmesh, &fec, vector_size, Ordering::byNODES); // phi vector
-    FiniteElementSpace v2dfespace(pmesh, &fec, 2, Ordering::byNODES); // 2D vector
+    ParFiniteElementSpace fespace(pmesh, &fec); // scalar
+    ParFiniteElementSpace vfespace(pmesh, &fec, vector_size, Ordering::byNODES); // phi vector
+    ParFiniteElementSpace v2dfespace(pmesh, &fec, 2, Ordering::byNODES); // 2D vector
     const int n_dof = fespace.GetVSize();
 
     NavierSolver flowsolver(pmesh, 2, nu);
@@ -107,14 +107,14 @@ int main(int argc, char *argv[]){
     u_ic->ProjectCoefficient(u_IC_coeff);
 
     // Load initial conditions and fill phi^0
-    GridFunction phi(&vfespace, phi_block.GetData());
-    GridFunction phi0(&vfespace, phi0_block.GetData());
+    ParGridFunction phi(&vfespace, phi_block.GetData());
+    ParGridFunction phi0(&vfespace, phi0_block.GetData());
     VectorFunctionCoefficient phi_initial(vector_size, phi0_function);
     phi.ProjectCoefficient(phi_initial);
     phi0.ProjectCoefficient(phi_initial);
 
      // Create references to the single phis
-    std::vector<GridFunction> phis(vector_size);
+    std::vector<ParGridFunction> phis(vector_size);
     for (int i = 0; i < vector_size; i++ ){
         phis[i].MakeRef(&fespace, phi_block.GetBlock(i),0);
     }
@@ -131,10 +131,10 @@ int main(int argc, char *argv[]){
     flowsolver.AddVelDirichletBC(u_BC, attr);
 
     // Calculating T
-    GridFunction *phi00 = &phis[0];
-    GridFunction *phi02 = &phis[2];
-    GridFunction *phi11 = &phis[1+N];
-    GridFunction *phi20 = &phis[2*N];
+    ParGridFunction *phi00 = &phis[0];
+    ParGridFunction *phi02 = &phis[2];
+    ParGridFunction *phi11 = &phis[1+N];
+    ParGridFunction *phi20 = &phis[2*N];
 
     GradientGridFunctionCoefficient grad_phi00_coeff(phi00);
     GradientGridFunctionCoefficient grad_phi02_coeff(phi02);
@@ -232,24 +232,24 @@ int main(int argc, char *argv[]){
     // ****************************************************************
     // Stuff for the output
 
-    GridFunction *chi_gf = new GridFunction(&fespace);
+    ParGridFunction *chi_gf = new ParGridFunction(&fespace);
     chi_gf->ProjectCoefficient(chi_coeff);
 
-    GridFunction *xi_gf = new GridFunction(&fespace);
+    ParGridFunction *xi_gf = new ParGridFunction(&fespace);
     xi_gf->ProjectCoefficient(xi_coeff);
 
-    GridFunction *T_gf = new GridFunction(&v2dfespace);
+    ParGridFunction *T_gf = new ParGridFunction(&v2dfespace);
     T_gf->ProjectCoefficient(*T);
 
-    GridFunction *C11_gf = new GridFunction(&fespace);
+    ParGridFunction *C11_gf = new ParGridFunction(&fespace);
     SumCoefficient *C11_coeff = new SumCoefficient(phi00_coeff, phi20_coeff, 25.132741228718345, 35.54306350526693);
     C11_gf->ProjectCoefficient(*C11_coeff);
 
-    GridFunction *C12_gf = new GridFunction(&fespace);
+    ParGridFunction *C12_gf = new ParGridFunction(&fespace);
     ProductCoefficient *C12_coeff = new ProductCoefficient(25.132741228718345, phi11_coeff);
     C12_gf->ProjectCoefficient(*C12_coeff);
 
-    GridFunction *C22_gf = new GridFunction(&fespace);
+    ParGridFunction *C22_gf = new ParGridFunction(&fespace);
     SumCoefficient *C22_coeff = new SumCoefficient(phi00_coeff, phi02_coeff, 25.132741228718345, 35.54306350526693);
     C22_gf->ProjectCoefficient(*C22_coeff);
 
@@ -296,7 +296,7 @@ int main(int argc, char *argv[]){
 
     // Calculating the divergence of u
     DivergenceGridFunctionCoefficient div_u_coeff(u_gf_NS);
-    GridFunction *div_u_gf = new GridFunction(&fespace);
+    ParGridFunction *div_u_gf = new ParGridFunction(&fespace);
     div_u_gf->ProjectCoefficient(div_u_coeff);
 
     VectorGridFunctionCoefficient u_coeff(u_gf_NS);
@@ -338,7 +338,7 @@ int main(int argc, char *argv[]){
     // Navier Stokes
     flowsolver.Setup(dt);
 
-    BilinearForm m(&fespace);
+    ParBilinearForm m(&fespace);
     m.AddDomainIntegrator(new MassIntegrator);
     m.Assemble();
 
@@ -396,10 +396,14 @@ int main(int argc, char *argv[]){
     for (int ti = 0; !done; ){
         cout << "t: " << t << "s / " << t_final << "s - dt: " << dt << endl;
 
+        F_x_block = 0.; 
+        F_x_block.Add(-1,phi_block); 
+
         // configuration space solver
         tmp = t;
         ode_solver_css->Step(phi_block, t, dt);
-
+        F_x_block.Add(1,phi_block); 
+        
         if(!prescribed_velocity){
             t = tmp;
         }
@@ -413,10 +417,30 @@ int main(int argc, char *argv[]){
             F_R_block.GetBlock(i) = tmp_vector;
         }
 
+        // for (int i =0; i < F_x_block.Size(); i++){
+        //     if(i % 9 == 0){
+        //         cout << F_x_block[i] << endl;
+        //         cout << F_R_block[i] << endl;
+                
+        //     }     
+        // }
+
         // update modes for the configuration space
         for (int l = 0; l < n_modes; l++){
             phi_modes[l].Add(dt * weights[l], F_R_block);
         }
+
+        // for (int i =0; i < phi_modes[0].Size(); i++){
+        //     if(i % 9 == 0){
+        //         cout << phi_modes[0][i] << endl;
+        //         cout << phi0_block[i] << endl;    
+        //         cout << phi_modes[0][i] + phi0_block[i] << endl;            
+        //         cout << phi_block[i] << endl;                
+        //         cout << endl; 
+        //     }     
+        // }
+
+        // return 0; 
 
         // physical space solver
         tmp = t;

@@ -14,7 +14,7 @@ private:
     double theta; 
     int vector_size, N, n_dof; 
 
-    FiniteElementSpace &fespace; 
+    ParFiniteElementSpace &fespace; 
     const FiniteElementCollection *u_fec; 
     ParFiniteElementSpace *u_fes; 
 
@@ -25,13 +25,14 @@ private:
     ParGridFunction *dxu1_gf, *dyu1_gf, *dxu2_gf, *dyu2_gf;
     
     BlockVector &phi0; 
-    std::vector<BlockVector> & phi_modes; 
+    std::vector<BlockVector> &phi_modes; 
     
     std::vector<std::vector<bool>> *A_entries;
     std::vector<std::vector<Coefficient*>> *coeff_matrix; 
     std::vector<std::vector<SparseMatrix>> *A_SpMat;
     std::vector<std::vector<SparseMatrix>> *L_SpMat;
     
+    BlockOperator *M_BO; 
     BlockOperator *A_BO; 
     BlockOperator *L_BO; 
 
@@ -40,14 +41,18 @@ private:
     SumCoefficient *A11_coeff, *A12_coeff, *A21_coeff, *A22_coeff; 
     ProductCoefficient *alpha_alpha_2_chi_coeff; 
 
+
+    // HypreBoomerAMG css_solver;
     BiCGSTABSolver css_solver;
-    mutable Vector z;
+    mutable Vector z, tmp, test;
 
 public:
 
-    CSS(FiniteElementSpace &fespace_, BlockVector &phi0_, std::vector<BlockVector> &phi_modes_, int vector_size_, const Array<int> &offsets_, ParGridFunction *u_gf_NS_, ProductCoefficient &chi_coeff_, ProductCoefficient &xi_coeff_): 
+    CSS(ParFiniteElementSpace &fespace_, BlockVector &phi0_, std::vector<BlockVector> &phi_modes_, int vector_size_, const Array<int> &offsets_, ParGridFunction *u_gf_NS_, ProductCoefficient &chi_coeff_, ProductCoefficient &xi_coeff_): 
         TimeDependentOperator(fespace_.GetVSize() * vector_size_),
         z(fespace_.GetVSize() * vector_size_), 
+        tmp(fespace_.GetVSize() * vector_size_), 
+        test(fespace_.GetVSize() * vector_size_), 
         fespace(fespace_),  
         phi0(phi0_),
         phi_modes(phi_modes_), 
@@ -58,6 +63,10 @@ public:
         chi_coeff(chi_coeff_), 
         xi_coeff(xi_coeff_){
 
+        M_BO = new BlockOperator(offsets_); 
+        A_BO = new BlockOperator(offsets_); 
+        L_BO = new BlockOperator(offsets_);
+
         setup_coefficients(); 
 
         A_entries = new std::vector<std::vector<bool>>(vector_size, std::vector<bool>(vector_size)); 
@@ -67,10 +76,7 @@ public:
         coeff_matrix = new std::vector<std::vector<Coefficient*>>(vector_size, std::vector<Coefficient*>(vector_size, ptr_0_coeff)); 
         
         A_SpMat = new std::vector<std::vector<SparseMatrix>>(vector_size, std::vector<SparseMatrix>(vector_size,m0->SpMat()));
-        L_SpMat = new std::vector<std::vector<SparseMatrix>>(vector_size, std::vector<SparseMatrix>(vector_size,m0->SpMat()));
-
-        A_BO = new BlockOperator(offsets_); 
-        L_BO = new BlockOperator(offsets_);
+        L_SpMat = new std::vector<std::vector<SparseMatrix>>(vector_size, std::vector<SparseMatrix>(vector_size,m0->SpMat()));        
 
         calculate_operators(); 
     }
@@ -80,22 +86,38 @@ public:
         A_BO->Mult(phi,A_phi); 
     }
 
-    void ImplicitSolve(const double dt, const Vector &phi_old, Vector &dphi_dt){
-        // A * phi^n 
-        A_BO->Mult(phi_old,z);
+    void ImplicitSolve(const double dt, const Vector &phi_old, Vector &phi_up){
+        
+        // accumulate phi_0 and modes in z
+        M_BO->Mult(phi0, z); 
+        for (int l = 0; l < n_modes; l++){    
+            M_BO->Mult(phi_modes[l], tmp);    
+            z.Add(1., tmp); 
+        }
+
         // calculate phi^n+1
-        css_solver.Mult(z,dphi_dt); 
+        css_solver.Mult(z,tmp); 
+
+        // calculate update 
+        phi_up = 0.; 
+        phi_up += tmp; 
+        phi_up.Add(-1.0, phi_old); 
+        phi_up /= dt; 
     }
 
     void setup_coefficients(){
 
         theta = get_theta(dt); 
         
-        m = new BilinearForm(&fespace);
+        m = new ParBilinearForm(&fespace);
         m->AddDomainIntegrator(new MassIntegrator); 
         m->Assemble(); 
 
-        m0 = new BilinearForm(&fespace);
+        for(int i = 0; i < vector_size; i++){
+            M_BO->SetBlock(i, i, m); 
+        }
+
+        m0 = new ParBilinearForm(&fespace);
         ConstantCoefficient m0_coef(0.);
         m0->AddDomainIntegrator(new MassIntegrator(m0_coef)); 
         m0->Assemble(); 
@@ -129,7 +151,7 @@ public:
     void calculate_operators(){
 
         fill_coefficient_matrix(*coeff_matrix, A11_coeff, A12_coeff, A21_coeff, A22_coeff, alpha_alpha_2_chi_coeff); 
-        
+    
         u_gf_NS->GetDerivative(1,0,*dxu1_gf); 
         u_gf_NS->GetDerivative(1,1,*dyu1_gf); 
         u_gf_NS->GetDerivative(2,0,*dxu2_gf); 
@@ -139,14 +161,14 @@ public:
             for(int j = 0; j < vector_size; j++){
                 if((*A_entries)[i][j]){
 
-                    BilinearForm a(&fespace);  
+                    ParBilinearForm a(&fespace);  
                     a.AddDomainIntegrator(new MassIntegrator(*((*coeff_matrix)[i][j]))); 
                     a.Assemble();
                     
                     (*A_SpMat)[i][j] = a.SpMat(); 
 
                     (*L_SpMat)[i][j] = a.SpMat();
-                    (*L_SpMat)[i][j] *= - theta * dt; 
+                    (*L_SpMat)[i][j] *= - theta; 
 
                     if(i == j){
                         (*L_SpMat)[i][j] += m->SpMat();

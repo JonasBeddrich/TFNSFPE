@@ -1,12 +1,12 @@
 // #define alpha_07
 // #define alpha_08
-#define alpha_09
-// #define alpha_1
+// #define alpha_09
+#define alpha_1
 
-// #define Experiment1
+#define Experiment1
 // #define Experiment2
 // #define Experiment3
-#define Experiment4
+// #define Experiment4
 // #define Experiment5_pres_u
 // #define Experiment5_pres_C
 // #define Experiment6
@@ -25,12 +25,12 @@ const double alpha = 0.5;
 /* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
 
 #if defined(alpha_1)
-double dt = 0.01;
+double dt = 0.1;
 int plot_frequency = 1; 
 #endif 
 
 #if defined(alpha_09)
-double dt = 0.005;
+double dt = 0.01;
 int plot_frequency = 2; 
 #endif 
 
@@ -48,7 +48,7 @@ int plot_frequency = 100;
 
 #if defined(Experiment1)
 const std::string scenario = "Exp1"; 
-double t_final = 10;
+double t_final = 1;
 const int n_refine = 0; 
 bool prescribed_velocity = true; 
 

@@ -14,9 +14,9 @@ private:
     ConstantCoefficient* eps_coeff; 
     VectorGridFunctionCoefficient &u_coeff; 
 
-    FiniteElementSpace &fespace; 
-    BilinearForm* m; 
-    BilinearForm* Fx; 
+    ParFiniteElementSpace &fespace; 
+    ParBilinearForm* m; 
+    ParBilinearForm* Fx; 
     SparseMatrix* M_m_beta_Fx; 
     
     BlockVector &phi0; 
@@ -27,7 +27,7 @@ private:
     mutable Vector z, tmp; 
 
 public: 
-    PSS(FiniteElementSpace &fespace_, BlockVector &phi0_, std::vector<BlockVector> &phi_modes_, VectorGridFunctionCoefficient &u_coeff_): 
+    PSS(ParFiniteElementSpace &fespace_, BlockVector &phi0_, std::vector<BlockVector> &phi_modes_, VectorGridFunctionCoefficient &u_coeff_): 
         TimeDependentOperator(fespace_.GetVSize()), 
         fespace(fespace_),                    
         phi0(phi0_),
@@ -37,11 +37,11 @@ public:
         u_coeff(u_coeff_){
         
         // weights for rational approximation 
-        beta = get_beta(dt); 
+        beta = get_theta(dt); 
         gammas = get_gammas(dt); 
         
         // mass matrix 
-        m = new BilinearForm(&fespace);
+        m = new ParBilinearForm(&fespace);
         m->AddDomainIntegrator(new MassIntegrator); 
         m->Assemble(); 
  
@@ -80,7 +80,7 @@ public:
 
     void calculate_operators(){
         // physical space operator        
-        Fx = new BilinearForm(&fespace); 
+        Fx = new ParBilinearForm(&fespace); 
         Fx->AddDomainIntegrator(new DiffusionIntegrator(*eps_coeff)); 
         Fx->AddDomainIntegrator(new ConvectionIntegrator(u_coeff)); 
         Fx->Assemble(); 
