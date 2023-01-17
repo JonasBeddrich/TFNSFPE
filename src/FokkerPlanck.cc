@@ -208,8 +208,11 @@ int main(int argc, char *argv[]){
     #endif
 
     #if defined(Experiment4)
-        ProductCoefficient xi_coeff(trace_C_coeff, trace_C_coeff);
-        ProductCoefficient chi_coeff(trace_C_coeff,trace_C_coeff);
+        ConstantCoefficient one_coeff(1.0);
+        ProductCoefficient xi_coeff(1.0, one_coeff);
+        ProductCoefficient chi_coeff(1.0, one_coeff);
+        // ProductCoefficient xi_coeff(trace_C_coeff, trace_C_coeff);
+        // ProductCoefficient chi_coeff(trace_C_coeff,trace_C_coeff);
     #endif
 
     #if defined(Experiment5_pres_u)
@@ -439,8 +442,6 @@ int main(int argc, char *argv[]){
         //         cout << endl; 
         //     }     
         // }
-
-        // return 0; 
 
         // physical space solver
         tmp = t;

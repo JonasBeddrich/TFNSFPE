@@ -1,12 +1,18 @@
+// #define alpha_01
+// #define alpha_02
+// #define alpha_03
+// #define alpha_04
+// #define alpha_05
+#define alpha_06
 // #define alpha_07
 // #define alpha_08
 // #define alpha_09
-#define alpha_1
+// #define alpha_1
 
-#define Experiment1
+// #define Experiment1
 // #define Experiment2
 // #define Experiment3
-// #define Experiment4
+#define Experiment4
 // #define Experiment5_pres_u
 // #define Experiment5_pres_C
 // #define Experiment6
@@ -20,29 +26,12 @@ const int dim = 2;
 const int n_modes = 20; 
 const int N = 20; 
 const int vector_size = N*N;
-const double alpha = 0.5; 
+const double alpha = 0.5; // this is the one for the weighted hermite polynomials 
 
 /* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
 
-#if defined(alpha_1)
-double dt = 0.1;
-int plot_frequency = 1; 
-#endif 
-
-#if defined(alpha_09)
-double dt = 0.01;
-int plot_frequency = 2; 
-#endif 
-
-#if defined(alpha_08)
-double dt = 0.001;
-int plot_frequency = 10; 
-#endif 
-
-#if defined(alpha_07)
-double dt = 0.0001;
-int plot_frequency = 100; 
-#endif 
+double dt = 0.00001; 
+int plot_frequency = 1000; 
 
 /* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
 
@@ -99,7 +88,7 @@ void u_IC(const Vector &x, double t, Vector &u){
 
 #if defined(Experiment4)
 const std::string scenario = "Exp4"; 
-double t_final = 2;
+double t_final = 1;
 const char *mesh_file = "../src/test.mesh";
 const int n_refine = 4; 
 bool prescribed_velocity = false;
