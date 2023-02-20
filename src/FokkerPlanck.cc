@@ -31,7 +31,7 @@ int main(int argc, char *argv[]){
     #endif
 
     #if defined(Experiment2)
-        *mesh = Mesh::MakeCartesian2D(64, 64, Element::Type::QUADRILATERAL);
+        *mesh = Mesh::MakeCartesian2D(8, 8, Element::Type::QUADRILATERAL);
     #endif
 
     #if defined(Experiment3)
@@ -166,7 +166,8 @@ int main(int argc, char *argv[]){
     VectorSumCoefficient T_34(T_3, T_4);
 
     #if !defined(Experiment5_pres_C)
-    VectorCoefficient *T = new VectorSumCoefficient(T_12, T_34);
+    double scale_T = 10; 
+    VectorCoefficient *T = new VectorSumCoefficient(T_12,T_34,scale_T,scale_T);
     #endif 
 
     #if defined(Experiment5_pres_C)
@@ -208,11 +209,11 @@ int main(int argc, char *argv[]){
     #endif
 
     #if defined(Experiment4)
-        ConstantCoefficient one_coeff(1.0);
-        ProductCoefficient xi_coeff(1.0, one_coeff);
-        ProductCoefficient chi_coeff(1.0, one_coeff);
-        // ProductCoefficient xi_coeff(trace_C_coeff, trace_C_coeff);
-        // ProductCoefficient chi_coeff(trace_C_coeff,trace_C_coeff);
+        // ConstantCoefficient one_coeff(1.0);
+        // ProductCoefficient xi_coeff(1.0, one_coeff);
+        // ProductCoefficient chi_coeff(1.0, one_coeff);
+        ProductCoefficient xi_coeff(trace_C_coeff, trace_C_coeff);
+        ProductCoefficient chi_coeff(trace_C_coeff,trace_C_coeff);
     #endif
 
     #if defined(Experiment5_pres_u)
@@ -358,6 +359,7 @@ int main(int argc, char *argv[]){
     // Prepare paraview output and save initial conditions
     ParaViewDataCollection *pd = NULL;
     pd = new ParaViewDataCollection(scenario
+        + symmetry 
         + "_" + tf_degree
         + "_N=" + to_string(N)
         + "_m=" + to_string(n_modes)
