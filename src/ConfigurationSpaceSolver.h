@@ -7,7 +7,7 @@
     This requires some special treatment throughout everything. 
 */
 
-class CSS : public TimeDependentOperator {
+class CSS {
 
 private:
 
@@ -42,15 +42,12 @@ private:
     ProductCoefficient *alpha_alpha_2_chi_coeff; 
     ConstantCoefficient *m0_coeff;
 
-
-    // HypreBoomerAMG css_solver;
     BiCGSTABSolver css_solver;
     mutable Vector z, tmp, test;
 
 public:
 
     CSS(ParFiniteElementSpace &fespace_, BlockVector &phi0_, std::vector<BlockVector> &phi_modes_, int vector_size_, const Array<int> &offsets_, ParGridFunction *u_gf_NS_, ProductCoefficient &chi_coeff_, ProductCoefficient &xi_coeff_): 
-        TimeDependentOperator(fespace_.GetVSize() * vector_size_),
         z(fespace_.GetVSize() * vector_size_), 
         tmp(fespace_.GetVSize() * vector_size_), 
         test(fespace_.GetVSize() * vector_size_), 
@@ -82,28 +79,35 @@ public:
         calculate_operators(); 
     }
 
-    void Mult(const Vector &phi, Vector &A_phi) const{
+    void apply_FR(const Vector &phi, Vector &A_phi) const{
         // setup_block_operators(); 
         A_BO->Mult(phi,A_phi); 
     }
 
-    void ImplicitSolve(const double dt, const Vector &phi_old, Vector &phi_up){
+    void solve_Id_minus_theta_FR(const Vector &y, Vector &x){
+        // calculates x = (Id - theta FR)^-1 M*y 
         
+        // z = M*y 
+        M_BO->Mult(y, z); 
+
+        // x = (Id - theta FR)^-1 z
+        css_solver.Mult(z,x); 
+
         // accumulate phi_0 and modes in z
-        M_BO->Mult(phi0, z); 
-        for (int l = 0; l < n_modes; l++){    
-            M_BO->Mult(phi_modes[l], tmp);    
-            z.Add(1., tmp); 
-        }
+        // M_BO->Mult(y, z); 
+        // for (int l = 0; l < n_modes; l++){    
+        //     M_BO->Mult(phi_modes[l], tmp);    
+        //     z.Add(1., tmp); 
+        // }
 
-        // calculate phi^n+1
-        css_solver.Mult(z,tmp); 
+        // // calculate phi^n+1
+        // css_solver.Mult(z,tmp); 
 
-        // calculate update 
-        phi_up = 0.; 
-        phi_up += tmp; 
-        phi_up.Add(-1.0, phi_old); 
-        phi_up /= dt; 
+        // // calculate update 
+        // phi_up = 0.; 
+        // phi_up += tmp; 
+        // phi_up.Add(-1.0, phi_old); 
+        // phi_up /= dt; 
     }
 
     void setup_coefficients(){

@@ -4,12 +4,14 @@
 */
 
 // Physical Space Solver 
-class PSS : public TimeDependentOperator {
+class PSS {
 
 private: 
     int current_block; 
     double beta; 
     std::vector<double> gammas; 
+
+    double *t; 
 
     ConstantCoefficient* eps_coeff; 
     VectorGridFunctionCoefficient &u_coeff; 
@@ -27,14 +29,14 @@ private:
     mutable Vector z, tmp; 
 
 public: 
-    PSS(ParFiniteElementSpace &fespace_, BlockVector &phi0_, std::vector<BlockVector> &phi_modes_, VectorGridFunctionCoefficient &u_coeff_): 
-        TimeDependentOperator(fespace_.GetVSize()), 
+    PSS(ParFiniteElementSpace &fespace_, BlockVector &phi0_, std::vector<BlockVector> &phi_modes_, VectorGridFunctionCoefficient &u_coeff_, double *t_):  
         fespace(fespace_),                    
         phi0(phi0_),
         phi_modes(phi_modes_), 
         z(fespace_.GetVSize()), 
         tmp(fespace_.GetVSize()),
-        u_coeff(u_coeff_){
+        u_coeff(u_coeff_), 
+        t(t_){
         
         // weights for rational approximation 
         beta = get_theta(dt); 
@@ -52,26 +54,41 @@ public:
         calculate_operators(); 
     }
 
-    void Mult(const Vector &a, Vector &b) const{
+    void apply_Fx(const Vector &a, Vector &b) const{
         Fx->Mult(a,b);
     }
 
-    void ImplicitSolve(const double dt, const Vector &phi_old, Vector &phi_up){
-    
-        // accumulate phi_0 and modes in z
-        m->Mult(phi0.GetBlock(current_block), z);
-        for (int l = 0; l < n_modes; l++){    
-            m->Mult(phi_modes[l].GetBlock(current_block), tmp);    
-            z.Add(gammas[l], tmp); 
-        }
+    // This method solves (Id - beta Fx) x = y 
+    void solve_Id_minus_beta_Fx(const Vector &y, Vector &x){
+        // calculates x = (Id - beta Fx)^-1 M*y 
+        
+        // z = M*y 
+        m->Mult(y,z); 
+        
+        // x = (Id - beta Fx)^-1 z  
+        pss_solver.Mult(z, x); 
 
-        // solver for phi^n+1
-        pss_solver.Mult(z, tmp); 
+        // for (int l = 0; l < n_modes; l++){    
+        //     m->Mult(phi_modes[l].GetBlock(current_block), tmp);    
+        //     z.Add(gammas[l], tmp); 
+        // } 
 
-        // calculate update 
-        phi_up = tmp; 
-        phi_up.Add(-1.0, phi_old); 
-        phi_up /= dt; 
+        // // This function solves (Id-beta Fx)^-1  
+        // // cout << "t: " << *t << endl; 
+        // // accumulate phi_0 and modes in z
+        // m->Mult(phi0.GetBlock(current_block), z);
+        // for (int l = 0; l < n_modes; l++){    
+        //     m->Mult(phi_modes[l].GetBlock(current_block), tmp);    
+        //     z.Add(gammas[l], tmp); 
+        // }
+
+        // // solver for phi^n+1
+        // pss_solver.Mult(z, tmp); 
+
+        // // calculate update 
+        // phi_up = tmp; 
+        // phi_up.Add(-1.0, phi_old); 
+        // phi_up /= dt; 
     }
     
     void set_current_block(int i){

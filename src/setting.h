@@ -5,9 +5,9 @@
 // #define alpha_05
 // #define alpha_06
 // #define alpha_07
-// #define alpha_08
+#define alpha_08
 // #define alpha_09
-#define alpha_1
+// #define alpha_1
 
 // #define Experiment1
 // #define Experiment2
@@ -16,6 +16,8 @@
 // #define Experiment5_pres_u
 // #define Experiment5_pres_C
 // #define Experiment6
+
+// #define calculate_initial_condition
 
 /* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
 
@@ -49,7 +51,7 @@ const double alpha = 0.5; // this is the one for the weighted hermite polynomial
 
 /* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
 
-double dt = 0.001; 
+double dt = 0.01; 
 int plot_frequency = 10; 
 
 /* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
@@ -106,10 +108,10 @@ void u_IC(const Vector &x, double t, Vector &u){
 #endif 
 
 #if defined(Experiment4)
-const std::string scenario = "Exp4_nonlinear_scaled_C"; 
+const std::string scenario = "Exp4_testing"; 
 double t_final = 1;
 const char *mesh_file = "../src/test.mesh";
-const int n_refine = 3; 
+const int n_refine = 2; 
 bool prescribed_velocity = false;
 
 // xi and chi are set depening on psi ... thus not defined here 
@@ -128,6 +130,7 @@ void u_BC(const Vector &x, double t, Vector&u){
 void u_IC(const Vector &x, double t, Vector &u){
     u(0) = 0; 
     u(1) = 0; 
+    // ode_solver_pss 
 }
 #endif 
 
@@ -211,7 +214,7 @@ void div_T(const Vector &x, double t, Vector &u){
 /* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
 
 // Initial condition
-void phi0_function(const Vector &x, Vector &y){
+void phi_psiM_function(const Vector &x, Vector &y){
     int dim = x.Size(); 
     int vector_size = y.Size(); 
 
