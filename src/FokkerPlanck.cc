@@ -120,10 +120,13 @@ int main(int argc, char *argv[]){
     ParGridFunction *u_ic = flowsolver.GetCurrentVelocity();
     VectorFunctionCoefficient u_IC_coeff(pmesh->Dimension(), u_IC);
     u_ic->ProjectCoefficient(u_IC_coeff);
+
+
     
-    // Load initial conditions and fill phi^0
+    // Load initial conditions and fill psiM
     VectorFunctionCoefficient phi_psiM_coeff(vector_size, phi_psiM_function);
-    phi_psiM.ProjectCoefficient(phi_psiM_coeff); 
+    phi_psiM.ProjectCoefficient(phi_psiM_coeff);
+    phi_psi0_block = phi_psiM_block;  
 
     // Create references to the single phis
     std::vector<ParGridFunction> phis_eta(vector_size);
@@ -182,7 +185,7 @@ int main(int argc, char *argv[]){
     VectorSumCoefficient T_34(T_3, T_4);
 
     #if !defined(Experiment5_pres_C)
-    double scale_T = 10; 
+    double scale_T = 1; 
     VectorCoefficient *T = new VectorSumCoefficient(T_12,T_34,scale_T,scale_T);
     #endif 
 
@@ -225,11 +228,11 @@ int main(int argc, char *argv[]){
     #endif
 
     #if defined(Experiment4)
-        // ConstantCoefficient one_coeff(1.0);
-        // ProductCoefficient xi_coeff(1.0, one_coeff);
-        // ProductCoefficient chi_coeff(1.0, one_coeff);
-        ProductCoefficient xi_coeff(trace_C_coeff, trace_C_coeff);
-        ProductCoefficient chi_coeff(trace_C_coeff,trace_C_coeff);
+        ConstantCoefficient one_coeff(1.0);
+        ProductCoefficient xi_coeff(1.0, one_coeff);
+        ProductCoefficient chi_coeff(1.0, one_coeff);
+        // ProductCoefficient xi_coeff(trace_C_coeff, trace_C_coeff);
+        // ProductCoefficient chi_coeff(trace_C_coeff,trace_C_coeff);
     #endif
 
     #if defined(Experiment5_pres_u)
@@ -274,15 +277,15 @@ int main(int argc, char *argv[]){
     C22_gf->ProjectCoefficient(*C22_coeff);
 
     // ****************************************************************
-    // Rational Approximation
+    // Rational Approximation for the TFNSFP system  
 
-    std::vector<double> lambdas = get_lambdas();
-    std::vector<double> weights = get_weights();
-    double w_inf = get_w_infinity();
+    std::vector<double> lambdas = get_lambdas(alpha);
+    std::vector<double> weights = get_weights(alpha);
+    double w_inf = get_w_infinity(alpha);
 
-    std::vector<double> gammas = get_gammas(dt);
-    double beta = get_beta(dt);
-    double delta = get_delta(dt);
+    std::vector<double> gammas = get_gammas(alpha, dt);
+    double beta = get_beta(alpha, dt);
+    double delta = get_delta(alpha, dt);
 
     for (auto i :weights){
         cout << i << " ";
@@ -295,9 +298,31 @@ int main(int argc, char *argv[]){
     cout << endl;
 
     // ****************************************************************
+    // Rational Approximation to compute psi 
+
+    std::vector<double> lambdas_psi = get_lambdas(1-alpha);
+    std::vector<double> weights_psi = get_weights(1-alpha);
+    double w_inf_psi = get_w_infinity(1-alpha);
+
+    std::vector<double> gammas_psi = get_gammas(1-alpha, dt);
+    double beta_psi = get_beta(1-alpha, dt);
+    double delta_psi = get_delta(1-alpha, dt);
+
+    for (auto i :weights_psi){
+        cout << i << " ";
+    }
+    cout << endl;
+
+    for (auto i :gammas_psi){
+        cout << i << " ";
+    }
+    cout << endl;
+
+    // ****************************************************************
     // Setup of the simulation
 
     double t = 0.0;
+    int iteration_counter; 
     double tmp = 0.0;
     bool done = false;
 
@@ -305,34 +330,26 @@ int main(int argc, char *argv[]){
     BlockVector tmp_block_vector(block_offsets);
     BlockVector tmp2_block_vector(block_offsets);
 
-    // Define two ODE solvers
-    ODESolver *ode_solver_css = NULL;
-    ODESolver *ode_solver_pss = NULL;
-    ode_solver_css = new BackwardEulerSolver;
-    ode_solver_pss = new BackwardEulerSolver;
-
-    // creating a dummy u to base the FD scheme from a gridfunction
+    // Get velocity and pressure from Navier-Stokes solver 
     ParGridFunction *u_gf_NS = flowsolver.GetCurrentVelocity();
     ParGridFunction *p_gf_NS = flowsolver.GetCurrentPressure();
+    VectorGridFunctionCoefficient u_coeff(u_gf_NS);
 
-    // Calculating the divergence of u
+    // Divergernce of u 
     DivergenceGridFunctionCoefficient div_u_coeff(u_gf_NS);
     ParGridFunction *div_u_gf = new ParGridFunction(&fespace);
     div_u_gf->ProjectCoefficient(div_u_coeff);
 
-    VectorGridFunctionCoefficient u_coeff(u_gf_NS);
-
     // ****************************************************************
     // Use a prescribed velocity 
-
+    // TODO: Make this as a define statement
     VectorFunctionCoefficient u_prescribed_coeff(dim, u_IC);
     if(prescribed_velocity){
         u_gf_NS->ProjectCoefficient(u_prescribed_coeff);
     }
 
     // ****************************************************************
-
-    // to visualize the gradient of u
+    // Visualization of the gradient of u 
     const FiniteElementCollection *u_fec = u_gf_NS->ParFESpace()->FEColl(); 
     ParFiniteElementSpace u_fes(pmesh, u_fec, 1); 
 
@@ -340,21 +357,22 @@ int main(int argc, char *argv[]){
     ParGridFunction *dyu1_gf = new ParGridFunction(&u_fes); 
     ParGridFunction *dxu2_gf = new ParGridFunction(&u_fes); 
     ParGridFunction *dyu2_gf = new ParGridFunction(&u_fes); 
+    
     u_gf_NS->GetDerivative(1,0,*dxu1_gf); 
     u_gf_NS->GetDerivative(1,1,*dyu1_gf); 
     u_gf_NS->GetDerivative(2,0,*dxu2_gf); 
     u_gf_NS->GetDerivative(2,1,*dyu2_gf); 
     
+    GridFunctionCoefficient d1u1_coeff(dxu1_gf); 
+    GridFunctionCoefficient d2u1_coeff(dyu1_gf); 
+    GridFunctionCoefficient d1u2_coeff(dxu2_gf); 
+    GridFunctionCoefficient d2u2_coeff(dyu2_gf); 
 
     // Configuration space solver
     CSS css(fespace, phi_Fpsi0_block, phi_eta_modes, vector_size, block_offsets, u_gf_NS, chi_coeff, xi_coeff);
-    // css.SetTime(t);
-    // ode_solver_css->Init(css);
 
     // Physical space solver
     PSS pss(fespace, phi_Fpsi0_block, phi_eta_modes, u_coeff, &t);
-    // pss.SetTime(t);
-    // ode_solver_pss -> Init(pss);
 
     // Navier Stokes
     flowsolver.Setup(dt);
@@ -391,6 +409,7 @@ int main(int argc, char *argv[]){
     pd->RegisterField("dyu1", dyu1_gf);
     pd->RegisterField("dxu2", dxu2_gf);
     pd->RegisterField("dyu2", dyu2_gf);
+    
     pd->RegisterField("_chi", chi_gf);
     pd->RegisterField("_T", T_gf);
 
@@ -399,97 +418,104 @@ int main(int argc, char *argv[]){
     pd->RegisterField("_C22", C22_gf);
 
     for (int i = 0; i < vector_size; i++ ){
-        pd->RegisterField("phi " + std::to_string(i), &phis_psi[i]);
+        pd->RegisterField("phi_eta " + std::to_string(i), &phis_eta[i]);
+        pd->RegisterField("phi_psi " + std::to_string(i), &phis_psi[i]);
     }
 
     pd->SetLevelsOfDetail(1);
     pd->SetDataFormat(VTKFormat::BINARY);
     pd->SetHighOrderOutput(true);
-    pd->SetCycle(0);
-    pd->SetTime(0.0);
-    pd->Save();
 
+   
     // ****************************************************************
     // Calculating initial condition 
 
-    #if defined(calculate_initial_condition)
-        cout << "Computing Initial Condition" << endl; 
-        double t_IC = 1; 
-        for (int ti = 0; !done; ){
-            cout << "t: " << t << "s / " << t_IC << "s - dt: " << dt << endl;
-            
-            tmp = t; 
-            // configuration space solver
-            ode_solver_css->Step(phi_eta_block, t, dt);
-            
-            // calculate FR
-            css.Mult(phi_eta_block, phi_FR_block);
+#if defined(calculate_initial_condition)
 
-            // calculate M^-1 FR
-            for(int i= 0; i < vector_size; i++){
-                m_solver.Mult(phi_FR_block.GetBlock(i), tmp_vector);
-                phi_FR_block.GetBlock(i) = tmp_vector;
-            }
+    // ****************************************************************
+    // Velocity field 
 
-            // update modes for the configuration space (only one is relevant for the IC)
-            phi_eta_modes[0].Add(dt, phi_FR_block);
+    cout << "Computing Initial Velocity field" << endl; 
+    
+    for (int i = 0; i < 100; i++){
+        cout << "Iteration: " << i << endl; 
+        double j=0; 
+        flowsolver.Step(j, 0.001, 0);
+    }
 
-            // physical space solver
-            for(int i = 0; i < vector_size; i++){
-                pss.set_current_block(i);
-                ode_solver_pss -> Step(phi_eta_block.GetBlock(i),t,dt);
-            }
+    css.calculate_operators();
+    pss.calculate_operators();
 
-            // calculate Fx
-            for(int i= 0; i < vector_size; i++){
-                pss.Mult(phi_eta_block.GetBlock(i), tmp_vector);
-                m_solver.Mult(tmp_vector, phi_Fx_block.GetBlock(i));
-            }
+    cout << "Inital Velocity field done" << endl; 
 
-            // update modes for the physical space (only one is relevant for the IC)
-            phi_eta_modes[0].Add(dt, phi_Fx_block);
+    // ****************************************************************
+    // Calculating psi0  
 
-            // advance iteration counter and save output
+    cout << "Computing Initial Condition" << endl; 
+    
+    double dt_IC = 0.01; 
+    int plot_frequency_IC = 10; 
+    t = 0.0; 
+    tmp = 0.0; 
+    done = false; 
 
-            t = tmp + dt; 
-            ti++;
-            if(ti % plot_frequency == 0){
-                pd->SetCycle(ti);
-                pd->SetTime(t_IC - t);
-                pd->Save();
-            }        
-            
-            done = (t >= t_IC - 1e-8 * dt);
+    // Set the CSS to the integer-order problem (Id - dt * FR)
+    css.set_theta(dt_IC); 
+    pss.set_beta(dt_IC); 
+    
+    double t_IC = 5; 
+    for (int ti = 0; !done; ){
+        if(ti % plot_frequency_IC == 0){
+            pd->SetCycle(iteration_counter);
+            pd->SetTime(-(t_IC - t));
+            pd->Save();
         }
 
-        // Update the initial condition psi_0 after the initialization process 
-        psi0_block += phi0_block; 
-        psi0_block += phi_eta_modes[0]; 
+        cout << "t: " << t << "s / " << t_IC << "s - dt: " << dt_IC << endl;
+        
+        css.solve_Id_minus_theta_FR(phi_psi0_block, tmp_block_vector);        
+        
+        for(int i = 0; i < vector_size; i++){
+            pss.solve_Id_minus_beta_Fx(tmp_block_vector.GetBlock(i), phi_psi0_block.GetBlock(i)); 
+        }
+        
+        phi_psi_block = phi_psi0_block; 
 
-        std::ofstream outstream;
-        outstream.open("Initial_Condition");
-        outstream << phi0_block.Size() << endl; 
-        phi0_block.Print(outstream);
-        outstream.close();  
+        t += dt_IC; 
+        ti++;
+        iteration_counter++;         
+        
+        done = (t >= t_IC - 1e-8 * dt_IC);
+    }
+
+    cout << "Initial Condition stored" << endl; 
+
+    std::ofstream outstream;
+    outstream.open("Initial_Condition");
+    outstream << phi_psi0_block.Size() << endl; 
+    phi_psi0_block.Print(outstream);
+    outstream.close();  
     
-    #endif 
+    // Reset the CSS to the fractional problem
+    // (Id - theta * FR)
+    css.reset_theta(); 
+    pss.reset_beta(); 
 
-    // load psi0 
+#endif 
+
+    cout << "Load Initial Condition" << endl; 
+    
     std::ifstream inputstream;     
     inputstream.open("Initial_Condition"); 
     phi_psi0_block.Load(inputstream); 
     inputstream.close(); 
+    phi_psi_block = phi_psi0_block; 
 
-    css.apply_FR(phi_psi0_block, phi_Fpsi0_block); 
-    for(int i= 0; i < vector_size; i++){
-        // pss.Mult(psi0_block.GetBlock(i), tmp_vector);
-        phi_Fpsi0_block.GetBlock(i) += tmp_vector; 
-        // Design Choice: I always consider the original vector phi and not M*phi 
-        m_solver.Mult(phi_Fpsi0_block.GetBlock(i), phi_Fpsi0_block.GetBlock(i));
-        // TODO: Check whether this really works 
-        // TODO: I mean m_solver.Mult(x,x) 
-        // TODO: Is there some issue with constant ? 
-    }
+    cout << "Write output: Initial Condition" << endl; 
+    
+    pd->SetCycle(0);
+    pd->SetTime(0.0);
+    pd->Save();
 
     // ****************************************************************
     // Time loop
@@ -499,10 +525,34 @@ int main(int argc, char *argv[]){
     done = false; 
     
     for (int ti = 0; !done; ){
+        
         cout << "t: " << t << "s / " << t_final << "s - dt: " << dt << endl;
         
         // ****************************************************************
-        // Configuration space 
+        // Calculate F(psi0) 
+        css.apply_FR(phi_psi0_block, phi_Fpsi0_block); 
+        for(int i= 0; i < vector_size; i++){
+            pss.apply_Fx(phi_psi0_block.GetBlock(i), tmp_vector);
+            phi_Fpsi0_block.GetBlock(i) += tmp_vector; 
+        }
+        
+        std::ofstream outstream1;
+        outstream1.open("Fpsi0");
+        outstream1 << phi_Fpsi0_block.Size() << endl; 
+        phi_Fpsi0_block.Print(outstream1);
+        outstream1.close();  
+
+        // Transform to M^-1 F(psi0)
+        // Design Choice: I always consider the original vector phi and not M*phi 
+        // the tmp_block_vector is necessary due to a constant first input element 
+
+        for(int i= 0; i < vector_size; i++){
+            m_solver.Mult(phi_Fpsi0_block.GetBlock(i), tmp_block_vector.GetBlock(i));
+        }
+        phi_Fpsi0_block = tmp_block_vector; 
+
+        // ****************************************************************
+        // Solve the configuration space problem 
 
         // summation over modes and right-hand side 
         tmp_block_vector = 0; 
@@ -511,13 +561,14 @@ int main(int argc, char *argv[]){
         }
         tmp_block_vector.Add(w_inf * std::pow(t + dt, alpha-1), phi_Fpsi0_block); 
     
-        // solve for phi^n+0.5 
+        // solve for eta^n+0.5 
         css.solve_Id_minus_theta_FR(tmp_block_vector, phi_eta_block); 
 
-        // calculate M^-1 FR phi 
-        css.apply_FR(phi_eta_block, phi_FR_block); 
+        tmp_block_vector = 0; 
+        // calculate M^-1 FR eta 
+        css.apply_FR(phi_eta_block, tmp_block_vector); 
         for(int i= 0; i < vector_size; i++){
-            m_solver.Mult(phi_FR_block.GetBlock(i), phi_FR_block.GetBlock(i));
+            m_solver.Mult(tmp_block_vector.GetBlock(i), phi_FR_block.GetBlock(i));
         }
 
         // update modes 
@@ -526,7 +577,7 @@ int main(int argc, char *argv[]){
         }
 
         // ****************************************************************
-        // Physical space 
+        // Solve the physical space problem  
 
         // summation over modes and right-hand side 
         tmp_block_vector = 0; 
@@ -535,16 +586,23 @@ int main(int argc, char *argv[]){
         }
         tmp_block_vector.Add(w_inf * std::pow(t + dt,alpha-1), phi_Fpsi0_block); 
 
-        // solve for phi^n+1 
+        // solve for eta^n+1 and store it 
         for(int i = 0; i < vector_size; i++){
             pss.solve_Id_minus_beta_Fx(tmp_block_vector.GetBlock(i), phi_eta_block.GetBlock(i)); 
         }
 
-        // calculate M^⁻1 Fx phi   
+        tmp_block_vector = 0; 
+        // calculate M^⁻1 Fx eta   
         for(int i = 0; i < vector_size; i++){
-            pss.apply_Fx(phi_eta_block.GetBlock(i), phi_Fx_block.GetBlock(i)); 
-            m_solver.Mult(phi_Fx_block.GetBlock(i), phi_Fx_block.GetBlock(i));
+            pss.apply_Fx(phi_eta_block.GetBlock(i), tmp_block_vector.GetBlock(i)); 
+            m_solver.Mult(tmp_block_vector.GetBlock(i), phi_Fx_block.GetBlock(i));
         }
+
+        std::ofstream outstream2;
+        outstream2.open("phi_eta_block");
+        outstream2 << phi_eta_block.Size() << endl; 
+        phi_eta_block.Print(outstream2);
+        outstream2.close();  
 
         // update modes 
         for (int l = 0; l < n_modes; l++){
@@ -553,15 +611,59 @@ int main(int argc, char *argv[]){
             phi_eta_modes[l] *= gammas[l];  
         }
 
+        // TODO: Make this a defined statement 
         if(!prescribed_velocity){
             flowsolver.Step(t, dt, ti);
+        } else {
+            t += dt; 
         }
 
-        // recalculate the operators for the new u
-        css.calculate_operators();
-        pss.calculate_operators();
+        // ****************************************************************
+        // Calculate psi from eta  
 
-        // just for output
+        // Calculate the psi modes 
+        for (int l = 0; l < n_modes; l++){
+            tmp_block_vector = phi_eta_block; 
+            tmp_block_vector *= dt * weights_psi[l]; 
+            tmp_block_vector += phi_psi_modes[l]; 
+            tmp_block_vector *= gammas_psi[l]; 
+            phi_psi_modes[l] = tmp_block_vector; 
+        }
+
+        // psi inf 
+        phi_psi_block = phi_eta_block; 
+        phi_psi_block *= w_inf_psi; 
+        // psi 0 
+        phi_psi_block += phi_psi0_block; 
+        // psi k 
+        for (int l = 0; l < n_modes; l++){
+            phi_psi_block += phi_psi_modes[l]; 
+        }
+        
+        // Check if done 
+        done = (t >= t_final - 1e-8 * dt);
+
+        // ****************************************************************
+        // Prepare operators for next iteration 
+        if(!done){
+            css.calculate_operators();
+            pss.calculate_operators();
+        }
+
+        // ****************************************************************
+        // Output 
+
+        // Calculate the derivatives of u 
+        u_gf_NS->GetDerivative(1,0,*dxu1_gf); 
+        u_gf_NS->GetDerivative(1,1,*dyu1_gf); 
+        u_gf_NS->GetDerivative(2,0,*dxu2_gf); 
+        u_gf_NS->GetDerivative(2,1,*dyu2_gf); 
+
+        // Project coefficients on grid functions for the output
+        dxu1_gf->ProjectCoefficient(d1u1_coeff); 
+        dyu1_gf->ProjectCoefficient(d2u1_coeff); 
+        dxu2_gf->ProjectCoefficient(d1u2_coeff); 
+        dyu2_gf->ProjectCoefficient(d2u2_coeff); 
         div_u_gf->ProjectCoefficient(div_u_coeff);
         T_gf->ProjectCoefficient(*T);
         chi_gf->ProjectCoefficient(chi_coeff);
@@ -570,21 +672,19 @@ int main(int argc, char *argv[]){
         C12_gf->ProjectCoefficient(*C12_coeff);
         C22_gf->ProjectCoefficient(*C22_coeff);
 
-        // advance iteration counter and save output
+        // Advance iteration counter and write output
         ti++;
+        iteration_counter++; 
         if(ti % plot_frequency == 0){
-            pd->SetCycle(ti);
+            pd->SetCycle(iteration_counter);
             pd->SetTime(t);
             pd->Save();
         }
-
-        done = (t >= t_final - 1e-8 * dt);
     }
 
     cout << "t: " << t << "s / " << t_final << "s" << endl;
 
     // Free the used memory.
-    delete ode_solver_css;
     delete pd;
     return 0;
 }

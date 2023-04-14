@@ -1,29 +1,18 @@
-// #define alpha_01
-// #define alpha_02
-// #define alpha_03
-// #define alpha_04
-// #define alpha_05
-// #define alpha_06
-// #define alpha_07
-#define alpha_08
-// #define alpha_09
-// #define alpha_1
-
 // #define Experiment1
 // #define Experiment2
-// #define Experiment3
-#define Experiment4
+#define Experiment3
+// #define Experiment4
 // #define Experiment5_pres_u
 // #define Experiment5_pres_C
 // #define Experiment6
 
-// #define calculate_initial_condition
+#define calculate_initial_condition
 
 /* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
 
-// #define normal 
+#define normal 
 // #define symmetric
-#define skew_symmetric
+// #define skew_symmetric
 
 #if defined(normal) 
     const std::string symmetry = ""; 
@@ -39,20 +28,24 @@
 
 /* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
 
+const double alpha = 1.0; 
+const std::string tf_degree = "alpha=" + std::to_string(alpha); 
+
+/* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
+
 using namespace std;
 using namespace mfem;
 
 const int dim = 2;
 const int n_modes = 20; 
-const int N = 12;
-// const int N = 10;
+const int N = 30;
 const int vector_size = N*N;
-const double alpha = 0.5; // this is the one for the weighted hermite polynomials 
+const double a = 0.5; // this is the one for the weighted hermite polynomials 
 
 /* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
 
-double dt = 0.01; 
-int plot_frequency = 10; 
+double dt = 0.1; 
+int plot_frequency = 1; 
 
 /* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
 
@@ -92,7 +85,7 @@ void u_IC(const Vector &x, double t, Vector &u){
 
 #if defined(Experiment3)
 const std::string scenario = "Exp3"; 
-double t_final = 10;
+double t_final = 20;
 const int n_refine = 0; 
 bool prescribed_velocity = true; 
 
@@ -102,35 +95,51 @@ const double nu = 0.;
 
 void u_BC(const Vector &x, double t, Vector &u){}; 
 void u_IC(const Vector &x, double t, Vector &u){
-    u(0) =   0.5 * x(0); 
+    u(0) = 0.5 * x(0); 
     u(1) = - 0.5 * x(1);
 }
 #endif 
 
 #if defined(Experiment4)
-const std::string scenario = "Exp4_testing"; 
-double t_final = 1;
+const std::string scenario = "Exp4_no16"; 
+double t_final = 10;
 const char *mesh_file = "../src/test.mesh";
-const int n_refine = 2; 
+const int n_refine = 4; 
 bool prescribed_velocity = false;
 
 // xi and chi are set depening on psi ... thus not defined here 
 const double nu = 0.59; 
-const double eps = 0.; 
+const double eps = 1.; 
+
+// void u_BC(const Vector &x, double t, Vector&u){
+//     if (x(1) > 0.5){ // top boundary 
+//         u(0) = 16 * x(0) * x(0) * (1-x(0)) * (1-x(0)); 
+//     } else { // bottom boundary 
+//         u(0) = 0; 
+//     }
+//     u(1) = 0; 
+// }
 
 void u_BC(const Vector &x, double t, Vector&u){
-    if (x(1) > 0.5){ // top boundary 
-        u(0) = 16 * x(0) * x(0) * (1-x(0)) * (1-x(0)); 
-    } else { // bottom boundary 
-        u(0) = 0; 
-    }
-    u(1) = 0; 
-}
+    // if (x(1) > 0.999999){ // top boundary 
+    u(0) = x(0) * x(0) * (1-x(0)) * (1-x(0)); 
+    u(1) = - x(0) * x(1) * (4 * x(0) * x(0) - 6 * x(0) + 2); 
+    // } else { // other boundaries 
+    //     u(0) = 0; 
+    //     u(1) = 0; 
+    // }
+} 
+
+// void u_BC(const Vector &x, double t, Vector&u){
+//     u(0) = x(1) * x(1) * x(0); 
+//     u(1) = -x(0) * x(1) * x(0) ; 
+// }
 
 void u_IC(const Vector &x, double t, Vector &u){
+    // u(0) = x(0) * x(0) * (1-x(0)) * (1-x(0)); 
+    // u(1) = - x(0) * x(1) * (4 * x(0) * x(0) - 6 * x(0) + 2); 
     u(0) = 0; 
     u(1) = 0; 
-    // ode_solver_pss 
 }
 #endif 
 

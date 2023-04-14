@@ -39,8 +39,8 @@ public:
         t(t_){
         
         // weights for rational approximation 
-        beta = get_theta(dt); 
-        gammas = get_gammas(dt); 
+        beta = get_beta(alpha, dt); 
+        gammas = get_gammas(alpha, dt); 
         
         // mass matrix 
         m = new ParBilinearForm(&fespace);
@@ -112,6 +112,16 @@ public:
         pss_solver.SetMaxIter(1000);
         pss_solver.SetPrintLevel(0);
         pss_solver.SetOperator(*M_m_beta_Fx); 
+    }
+
+    void set_beta(double beta_){
+        beta = beta_; 
+        calculate_operators(); 
+    }
+
+    void reset_beta(){
+        beta = get_beta(alpha, dt); 
+        calculate_operators(); 
     }
 
     ~PSS(){}

@@ -39,7 +39,7 @@ private:
     ProductCoefficient &chi_coeff, &xi_coeff; 
     GridFunctionCoefficient *d1u1_coeff, *d1u2_coeff, *d2u1_coeff, *d2u2_coeff; 
     SumCoefficient *A11_coeff, *A12_coeff, *A21_coeff, *A22_coeff, *du_sym_coeff, *skew_12_coeff, *skew_21_coeff; 
-    ProductCoefficient *alpha_alpha_2_chi_coeff; 
+    ProductCoefficient *a_a_2_chi_coeff; 
     ConstantCoefficient *m0_coeff;
 
     BiCGSTABSolver css_solver;
@@ -112,7 +112,7 @@ public:
 
     void setup_coefficients(){
 
-        theta = get_theta(dt); 
+        theta = get_theta(alpha, dt); 
         
         m = new ParBilinearForm(&fespace);
         m->AddDomainIntegrator(new MassIntegrator); 
@@ -167,13 +167,12 @@ public:
             A22_coeff = new SumCoefficient(xi_coeff, *m0_coeff, 1.0, -1.0); 
         #endif
 
-
-        alpha_alpha_2_chi_coeff = new ProductCoefficient(2 * alpha * alpha, chi_coeff); 
+        a_a_2_chi_coeff = new ProductCoefficient(2 * a * a, chi_coeff); 
     }
 
     void calculate_operators(){
 
-        fill_coefficient_matrix(*coeff_matrix, A11_coeff, A12_coeff, A21_coeff, A22_coeff, alpha_alpha_2_chi_coeff); 
+        fill_coefficient_matrix(*coeff_matrix, A11_coeff, A12_coeff, A21_coeff, A22_coeff, a_a_2_chi_coeff); 
     
         u_gf_NS->GetDerivative(1,0,*dxu1_gf); 
         u_gf_NS->GetDerivative(1,1,*dyu1_gf); 
@@ -208,6 +207,16 @@ public:
         css_solver.SetMaxIter(2000);
         css_solver.SetPrintLevel(0);
         css_solver.SetOperator(*L_BO); 
+    }
+
+    void set_theta(double theta_){
+        theta = theta_; 
+        calculate_operators(); 
+    }
+
+    void reset_theta(){
+        theta = get_theta(alpha, dt); 
+        calculate_operators(); 
     }
 
     ~CSS(){}
