@@ -89,6 +89,10 @@ int main(int argc, char *argv[]){
         block_offsets[i] =  n_dof;
     }
     block_offsets.PartialSum();
+    
+    // cout << block_offsets[0] << endl; 
+    // cout << block_offsets[vector_size] << endl; 
+    // cout << block_offsets[vector_size+1] << endl; 
 
     // Blockvector for eta and psi 
     BlockVector phi_eta_block(block_offsets);

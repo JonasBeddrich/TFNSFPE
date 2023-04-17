@@ -35,6 +35,9 @@ private:
     BlockOperator *M_BO; 
     BlockOperator *A_BO; 
     BlockOperator *L_BO; 
+    BlockOperator *A44;
+    BlockOperator *A42;
+     
 
     ProductCoefficient &chi_coeff, &xi_coeff; 
     GridFunctionCoefficient *d1u1_coeff, *d1u2_coeff, *d2u1_coeff, *d2u2_coeff; 
@@ -43,6 +46,7 @@ private:
     ConstantCoefficient *m0_coeff;
 
     BiCGSTABSolver css_solver;
+    BiCGSTABSolver A44_solver;
     mutable Vector z, tmp, test;
 
 public:
@@ -84,30 +88,154 @@ public:
         A_BO->Mult(phi,A_phi); 
     }
 
-    void solve_Id_minus_theta_FR(const Vector &y, Vector &x){
-        // calculates x = (Id - theta FR)^-1 M*y 
+    void solve_Id_minus_theta_FR(const BlockVector &y, BlockVector &x){
+
+        // Setup 
+        int counter = 3; 
+        Array<int> part_offsets(counter+1);
+        part_offsets[0] = 0; 
+        for (int i = 1; i < counter + 1; i++){
+            part_offsets[i] = n_dof;
+        }
+        part_offsets.PartialSum();
+
+        BlockVector mu_k(part_offsets); 
+        BlockVector phi_k(part_offsets); 
+        BlockVector phi_km2(part_offsets);
+        BlockVector A42_phi_km2(part_offsets); 
+
+        A44 = new BlockOperator(part_offsets); 
+        A42 = new BlockOperator(part_offsets); 
         
+        // Load mu k 
+        // 0,4 - 1,3 - 2,2 - 3,1 - 4,0 
+
+        for(int i=0; i < counter; i++){
+            int z = i; 
+            int k = (counter-1) -i; 
+            // cout << z << " " << k << " " << z*N + k << endl;  
+            m->Mult(y.GetBlock(z*N + k), mu_k.GetBlock(i)); 
+        }
+
+        // ****************************************************************
+        // calculates x = (Id - theta FR)^-1 M*y 
+
         // z = M*y 
         M_BO->Mult(y, z); 
 
         // x = (Id - theta FR)^-1 z
         css_solver.Mult(z,x); 
 
-        // accumulate phi_0 and modes in z
-        // M_BO->Mult(y, z); 
-        // for (int l = 0; l < n_modes; l++){    
-        //     M_BO->Mult(phi_modes[l], tmp);    
-        //     z.Add(1., tmp); 
+        // ****************************************************************
+        // The following code is concerned with solving A_4,4 phi = A_4,2 mu 
+
+        // Load phi km2 
+        // 0,2 - 1,1 - 2,0 
+
+        for(int i=0; i < counter-2; i++){
+            int z = i; 
+            int k = (counter-1) -2 -i; 
+            // cout << z << " " << k << " " << z*N + k << endl;  
+
+            m->Mult(x.GetBlock(z*N + k), phi_km2.GetBlock(i)); 
+        }
+
+        // Load A_4,2
+
+        for(int i=0; i < counter; i++){ // loop rows 
+            for(int j=0; j < counter-2; j++){ // loop columns, where the indices add up to z+k-2 
+                
+                int z_i = i; 
+                int k_i = (counter-1) -i; 
+                
+                int z_j = j;
+                int k_j = (counter-1) -2 -j;   
+
+                if(z_j < 0 || k_j < 0){
+
+                } else{
+                    // cout << "i " << " " << z_i << " " << k_i << endl; 
+                    // cout << "j " << " " << z_j << " " << k_j << endl; 
+
+                    if((*A_entries)[z_i * N + k_i][z_j * N + k_j]){
+                        cout << "A entries is true: " << z_i << " " << k_i << " " << z_j << " " << k_j << endl; 
+                        A42->SetBlock(i,j,&(L_BO->GetBlock(z_i * N + k_i,z_j * N + k_j))); 
+                    } 
+                }
+            }
+        }
+
+        // Compute A_4,2 phi 
+        A42->Mult(phi_km2, A42_phi_km2); 
+
+        // mu_k = mu_k + A_42 phi_km2
+        mu_k += A42_phi_km2; 
+
+        // Load A_4,4
+        for(int i=0; i < counter; i++){ // loop rows 
+            for(int j=0; j < counter; j++){ // loop columns 
+                
+                int z_i = i; 
+                int k_i = (counter-1) -i; 
+                
+                int z_j = j;  
+                int k_j = (counter-1) -j; 
+
+                if((*A_entries)[z_i * N + k_i][z_j * N + k_j]){
+                    A44->SetBlock(i,j,&(L_BO->GetBlock(z_i * N + k_i,z_j * N + k_j))); 
+                } 
+            }
+        }
+
+        // Solve A44 ... 
+        A44_solver.iterative_mode = false;
+        A44_solver.SetRelTol(1e-12);
+        A44_solver.SetMaxIter(2000);
+        A44_solver.SetPrintLevel(0);
+        A44_solver.SetOperator(*A44); 
+
+        A44_solver.Mult(mu_k, phi_k); 
+
+        // Write phi km2 
+        // 0,4 - 1,3 - 2,2 - 3,1 - 4,0 
+
+        for(int i=0; i < counter; i++){
+            int z = i; 
+            int k = (counter-1) -i; 
+
+            for (int j = 0; j < n_dof; j++){
+                cout << phi_k.GetBlock(i)[j] << " " << x.GetBlock(z*N + k)[j] << endl; 
+            }
+            // cout << z << " " << k << " " << z*N + k << endl;  
+            // phi_k.GetBlock(i) = y.GetBlock(z*N + k); 
+        }
+
+        // for(int i=0; i < 3; i++){
+        //     for(int j=0; j < 3; j++){
+        //         if((*A_entries)[i][j]){
+        //             partial->SetBlock(i,j,&(L_BO->GetBlock(i,j))); 
+        //         }
+        //     }
         // }
 
-        // // calculate phi^n+1
-        // css_solver.Mult(z,tmp); 
+        // cout << "multiplication" << endl; 
+        // partial->Mult(asdf, bsdf); 
 
-        // // calculate update 
-        // phi_up = 0.; 
-        // phi_up += tmp; 
-        // phi_up.Add(-1.0, phi_old); 
-        // phi_up /= dt; 
+        // phi0 = mu0 
+
+        // for i = 2, 4, ... N 
+
+        // tmp_offsets = ... 
+
+        // Array<int> block_offsets(vector_size+1);
+        // block_offsets[0]=0;
+        // for (int i = 1; i < vector_size + 1; i++){
+        //     block_offsets[i] =  n_dof;
+        // }
+        // block_offsets.PartialSum();
+
+        // LBO = new BlockOperator( tmp_offsets )
+
     }
 
     void setup_coefficients(){

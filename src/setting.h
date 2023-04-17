@@ -38,7 +38,7 @@ using namespace mfem;
 
 const int dim = 2;
 const int n_modes = 20; 
-const int N = 30;
+const int N = 10;
 const int vector_size = N*N;
 const double a = 0.5; // this is the one for the weighted hermite polynomials 
 
