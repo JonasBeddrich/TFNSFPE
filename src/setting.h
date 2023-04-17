@@ -1,7 +1,7 @@
 // #define Experiment1
 // #define Experiment2
-#define Experiment3
-// #define Experiment4
+// #define Experiment3
+#define Experiment4
 // #define Experiment5_pres_u
 // #define Experiment5_pres_C
 // #define Experiment6
@@ -28,7 +28,7 @@
 
 /* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
 
-const double alpha = 1.0; 
+const double alpha = 0.8; 
 const std::string tf_degree = "alpha=" + std::to_string(alpha); 
 
 /* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
@@ -38,14 +38,14 @@ using namespace mfem;
 
 const int dim = 2;
 const int n_modes = 20; 
-const int N = 30;
+const int N = 10;
 const int vector_size = N*N;
 const double a = 0.5; // this is the one for the weighted hermite polynomials 
 
 /* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
 
-double dt = 0.1; 
-int plot_frequency = 1; 
+double dt = 0.001; 
+int plot_frequency = 100; 
 
 /* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
 
@@ -109,7 +109,7 @@ bool prescribed_velocity = false;
 
 // xi and chi are set depening on psi ... thus not defined here 
 const double nu = 0.59; 
-const double eps = 1.; 
+const double eps = 1.; // this is changed in comparison to the Mizerova and She paper 
 
 // void u_BC(const Vector &x, double t, Vector&u){
 //     if (x(1) > 0.5){ // top boundary 
