@@ -35,7 +35,7 @@ int main(int argc, char *argv[]){
     #endif
 
     #if defined(Experiment3)
-        *mesh = Mesh::MakeCartesian2D(4, 4, Element::Type::QUADRILATERAL);
+        *mesh = Mesh::MakeCartesian2D(2, 2, Element::Type::QUADRILATERAL);
     #endif
 
     #if defined(Experiment4)

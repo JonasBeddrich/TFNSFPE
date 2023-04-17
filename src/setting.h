@@ -6,7 +6,7 @@
 // #define Experiment5_pres_C
 // #define Experiment6
 
-#define calculate_initial_condition
+// #define calculate_initial_condition
 
 /* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
 
@@ -38,13 +38,13 @@ using namespace mfem;
 
 const int dim = 2;
 const int n_modes = 20; 
-const int N = 10;
+const int N = 3;
 const int vector_size = N*N;
 const double a = 0.5; // this is the one for the weighted hermite polynomials 
 
 /* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
 
-double dt = 0.05; 
+double dt = 0.5; 
 int plot_frequency = 1; 
 
 /* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
@@ -85,7 +85,7 @@ void u_IC(const Vector &x, double t, Vector &u){
 
 #if defined(Experiment3)
 const std::string scenario = "Exp3"; 
-double t_final = 20;
+double t_final = 1;
 const int n_refine = 0; 
 bool prescribed_velocity = true; 
 
