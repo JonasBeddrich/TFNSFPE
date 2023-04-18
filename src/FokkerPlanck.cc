@@ -441,11 +441,11 @@ int main(int argc, char *argv[]){
 
     cout << "Computing Initial Velocity field" << endl; 
     
-    for (int i = 0; i < 100; i++){
-        cout << "Iteration: " << i << endl; 
-        double j=0; 
-        flowsolver.Step(j, 0.001, 0);
-    }
+    // for (int i = 0; i < 100; i++){
+    //     cout << "Iteration: " << i << endl; 
+    //     double j=0; 
+    //     flowsolver.Step(j, 0.001, 0);
+    // }
 
     css.calculate_operators();
     pss.calculate_operators();

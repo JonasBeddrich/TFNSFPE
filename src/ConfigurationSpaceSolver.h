@@ -95,52 +95,27 @@ public:
         
         // ****************************************************************
         // calculates x = (Id - theta FR)^-1 M*y 
-
-        // z = M*y 
-        cout << "y" << endl;
-        for(int i = 0; i < 9; i++){
-            cout << "i: " << i; 
-            for(int j = 0; j < 9; j++){
-                cout << " - " << y[i*9+j] ; 
-            }
-            cout << endl; 
-        }
-        cout << endl; 
-
-        M_BO->Mult(y, z); 
-
-        cout << "z" << endl;
-        for(int i = 0; i < 9; i++){
-            cout << "i: " << i; 
-            for(int j = 0; j < 9; j++){
-                cout << " - " << z[i*9+j] ; 
-            }
-            cout << endl; 
-        }
-        cout << endl; 
-
         // x = (Id - theta FR)^-1 z
-        css_solver.Mult(z,x); 
+        // M_BO->Mult(y, z); 
+        // css_solver.Mult(z,x); 
 
-        cout << "x" << endl;
-        for(int i = 0; i < 9; i++){
-            cout << "i: " << i; 
-            for(int j = 0; j < 9; j++){
-                cout << " - " << x[i*9+j] ; 
-            }
-            cout << endl; 
-        }
-        cout << endl; 
+        // cout << "x" << endl;
+        // for(int i = 0; i < x.Size()/9; i++){
+        //     cout << "i: " << i; 
+        //     for(int j = 0; j < 9; j++){
+        //         cout << " - " << x[i*9+j] ; 
+        //     }
+        //     cout << endl; 
+        // }
+        // cout << endl; 
 
         // ****************************************************************
         // The following code is concerned with solving A_4,4 phi = A_4,2 mu 
 
-        // for (int counter = 1; counter < 2*N; counter++){ // loop over the diagonals 
-        for (int counter = 1; counter < 4; counter++){ // loop over the diagonals 
-        
+        for (int counter = 1; counter < 2*N; counter++){ // loop over the diagonals 
+            // cout << endl; 
+            // cout << "Counter: " << counter << endl; 
             if(counter < N+1){
-                cout << endl; 
-                cout << "Counter: " << counter << endl; 
                 // cout << "if" << endl; 
                 // Setup 
                 Array<int> part_offsets(counter+1);
@@ -229,7 +204,6 @@ public:
                         } 
                     }
                 }
-                cout << endl; 
                 // cout << (*L_SpMat)[2][0] << endl; 
                 // cout << (*L_SpMat)[4][0] << endl; 
                 // cout << (*L_SpMat)[6][0] << endl; 
@@ -246,13 +220,14 @@ public:
                 A44_solver.SetOperator(*A44); 
                 A44_solver.Mult(mu_k, phi_k); 
 
-                cout << "phi_k" << endl; 
-                for(int i = 0; i < phi_k.Size() / 9; i++){
-                    for(int j = 0; j < 9; j++){
-                    cout << " - " << phi_k[i*9+j]; 
-                    }
-                    cout << endl; 
-                }                
+                // cout << "phi_k" << endl; 
+                // for(int i = 0; i < phi_k.Size() / 9; i++){
+                //     cout << i; 
+                //     for(int j = 0; j < 9; j++){
+                //     cout << " - " << phi_k[i*9+j]; 
+                //     }
+                //     cout << endl; 
+                // }                
 
                 // Write phi km2 
                 for(int z=0; z < counter; z++){
@@ -270,211 +245,265 @@ public:
                 }
             } 
                 
-            // else if (counter == N+1){
-            //     // cout << "else if" << endl; 
-            //     // Setup 
-            //     Array<int> part_offsets(N);
-            //     part_offsets[0] = 0; 
-            //     for (int i = 1; i < N; i++){
-            //         part_offsets[i] = n_dof;
-            //     }
-            //     part_offsets.PartialSum();
+            else if (counter == N+1){
+                // cout << "else if" << endl; 
+                // Setup 
+                Array<int> part_offsets(N);
+                part_offsets[0] = 0; 
+                for (int i = 1; i < N; i++){
+                    part_offsets[i] = n_dof;
+                }
+                part_offsets.PartialSum();
 
-            //     BlockVector mu_k(part_offsets); 
-            //     BlockVector phi_k(part_offsets); 
-            //     BlockVector phi_km2(part_offsets);
-            //     BlockVector A42_phi_km2(part_offsets); 
+                BlockVector mu_k(part_offsets); 
+                BlockVector phi_k(part_offsets); 
+                BlockVector phi_km2(part_offsets);
+                BlockVector A42_phi_km2(part_offsets); 
 
-            //     A44 = new BlockOperator(part_offsets); 
-            //     A42 = new BlockOperator(part_offsets); 
+                A44 = new BlockOperator(part_offsets); 
+                A42 = new BlockOperator(part_offsets); 
                 
-            //     // Load mu k 
-            //     for(int i=0; i < N-1; i++){
-            //         int z = i +1; 
-            //         int k = N -z; 
-            //         // cout << N << " " << i << " " << z << " " << k << " " << z*N + k << endl;  
-            //         m->Mult(y.GetBlock(z*N + k), mu_k.GetBlock(i)); 
-            //     }
+                // Load mu k 
+                for(int i=0; i < N-1; i++){
+                    int z = i +1; 
+                    int k = N -z; 
+                    // cout << N << " " << i << " " << z << " " << k << " " << z*N + k << endl;  
+                    m->Mult(y.GetBlock(z*N + k), mu_k.GetBlock(i)); 
+                }
 
-            //     // Load phi km2 
-            //     for(int i=0; i < N-1; i++){
-            //         int k = N -2 -i; 
-            //         int z = N -2 -k; 
-            //         // cout << i << " " << z << " " << k << " " << z*N + k << endl;  
-            //         m->Mult(x.GetBlock(z*N + k), phi_km2.GetBlock(i)); 
-            //     }
+                // Load phi km2 
+                for(int i=0; i < N-1; i++){
+                    int k = N -2 -i; 
+                    int z = N -2 -k; 
+                    // cout << i << " " << z << " " << k << " " << z*N + k << endl;  
+                    phi_km2.GetBlock(z) = x.GetBlock(z*N + k); 
+                }
 
-            //     // Load A_k,km2
-            //     for(int i=0; i < N-1; i++){ // loop rows 
-            //         for(int j=0; j < N-1; j++){ // loop columns 
-            //             int z_i = i +1; 
-            //             int k_i = N -z_i;  
+                // Load A_k,km2
+                for(int i=0; i < N-1; i++){ // loop rows 
+                    for(int j=0; j < N-1; j++){ // loop columns 
+                        int z_i = i +1; 
+                        int k_i = N -z_i;  
                         
-            //             int k_j = N -2 -j; 
-            //             int z_j = N -2 -k_j; 
+                        int k_j = N -2 -j; 
+                        int z_j = N -2 -k_j; 
 
-            //             // cout << "i " << i << " " << z_i << " " << k_i << endl; 
-            //             // cout << "j " << j << " " << z_j << " " << k_j << endl; 
-            //             // cout << endl; 
-            //             if((*A_entries)[z_i * N + k_i][z_j * N + k_j]){
-            //                 // cout << "A entries is true: " << z_i << " " << k_i << " " << z_j << " " << k_j << endl; 
-            //                 A42->SetBlock(i,j,&(L_BO->GetBlock(z_i * N + k_i,z_j * N + k_j))); 
-            //             } 
-            //         }
-            //     }
+                        // cout << "i " << i << " " << z_i << " " << k_i << endl; 
+                        // cout << "j " << j << " " << z_j << " " << k_j << endl; 
+                        // cout << endl; 
+                        if((*A_entries)[z_i * N + k_i][z_j * N + k_j]){
+                            // cout << "A entries is true: " << z_i << " " << k_i << " " << z_j << " " << k_j << endl; 
+                            A42->SetBlock(i,j,&(L_BO->GetBlock(z_i * N + k_i,z_j * N + k_j))); 
+                        } 
+                    }
+                }
 
-            //     // Compute A_4,2 phi 
-            //     A42->Mult(phi_km2, A42_phi_km2); 
-            //     mu_k -= A42_phi_km2; 
-            //     // TODO: I think this should be a minus 
+                // Compute A_4,2 phi 
+                A42->Mult(phi_km2, A42_phi_km2); 
+                mu_k -= A42_phi_km2; 
+                // TODO: I think this should be a minus 
                 
-            //     // Load A_4,4
-            //     for(int i=0; i < N-1; i++){ // loop rows 
-            //         for(int j=0; j < N-1; j++){ // loop columns 
-            //             int z_i = i +1; 
-            //             int k_i = N -z_i; 
+                // Load A_4,4
+                for(int i=0; i < N-1; i++){ // loop rows 
+                    for(int j=0; j < N-1; j++){ // loop columns 
+                        int z_i = i +1; 
+                        int k_i = N -z_i; 
                         
-            //             int z_j = j +1; 
-            //             int k_j = N -z_j; 
+                        int z_j = j +1; 
+                        int k_j = N -z_j; 
                         
-            //             // cout << "i " << i << " " << z_i << " " << k_i << endl; 
-            //             // cout << "j " << j << " " << z_j << " " << k_j << endl; 
-            //             // cout << endl; 
+                        // cout << "i " << i << " " << z_i << " " << k_i << endl; 
+                        // cout << "j " << j << " " << z_j << " " << k_j << endl; 
+                        // cout << endl; 
 
-            //             if((*A_entries)[z_i * N + k_i][z_j * N + k_j]){
-            //                 A44->SetBlock(i,j,&(L_BO->GetBlock(z_i * N + k_i,z_j * N + k_j))); 
-            //             } 
-            //         }
-            //     }
+                        if((*A_entries)[z_i * N + k_i][z_j * N + k_j]){
+                            A44->SetBlock(i,j,&(L_BO->GetBlock(z_i * N + k_i,z_j * N + k_j))); 
+                        } 
+                    }
+                }
 
-            //     // Solve A44 ... 
-            //     A44_solver.SetOperator(*A44); 
-            //     A44_solver.Mult(mu_k, phi_k); 
+                // Solve A44 ... 
+                A44_solver.SetOperator(*A44); 
+                A44_solver.Mult(mu_k, phi_k); 
 
-            //     // Write phi_k 
-            //     for(int i=0; i < N-1; i++){
-            //         int z = i +1; 
-            //         int k = N -z; 
-            //         // for (int j = 0; j < n_dof; j++){
-            //             // cout << phi_k.GetBlock(i)[j] << " " << x.GetBlock(z*N + k)[j] << endl; 
-            //         // }
-            //         x.GetBlock(z*N + k) = phi_k.GetBlock(i); 
-            //         // for (int j = 0; j < n_dof; j++){
-            //         //     cout << phi_k.GetBlock(i)[j] << " " << x.GetBlock(z*N + k)[j] << endl; 
-            //         // }
-            //         // cout << z << " " << k << " " << z*N + k << endl;  
-            //     }
-            // } 
+                // Write phi_k 
+                for(int i=0; i < N-1; i++){
+                    int z = i +1; 
+                    int k = N -z; 
+                    // for (int j = 0; j < n_dof; j++){
+                        // cout << phi_k.GetBlock(i)[j] << " " << x.GetBlock(z*N + k)[j] << endl; 
+                    // }
+                    x.GetBlock(z*N + k) = phi_k.GetBlock(i); 
+                    // for (int j = 0; j < n_dof; j++){
+                    //     cout << phi_k.GetBlock(i)[j] << " " << x.GetBlock(z*N + k)[j] << endl; 
+                    // }
+                    // cout << z << " " << k << " " << z*N + k << endl;  
+                }
+
+                // cout << "phi_k" << endl; 
+                // for(int i = 0; i < phi_k.Size() / 9; i++){
+                //     cout << i; 
+                //     for(int j = 0; j < 9; j++){
+                //     cout << " - " << phi_k[i*9+j]; 
+                //     }
+                //     cout << endl; 
+                // }                
+            } 
             
-            // else { // counter > N+1 
+            else { // counter > N+1 
 
-            //     // cout << "else" << endl; 
-            //     // Setup 
-            //     // cout << counter << " - " << 2*N -counter +2 +1 << endl; 
-            //     Array<int> part_offsets(2*N -counter +2 +1);
-            //     part_offsets[0] = 0; 
-            //     for (int i = 1; i < 2*N -counter +2 +1; i++){
-            //         part_offsets[i] = n_dof;
-            //     }
-            //     part_offsets.PartialSum();
+                // cout << "else" << endl; 
+                // Setup 
+                // cout << counter << " - " << 2*N -counter +2 +1 << endl; 
+                Array<int> short_offsets(2*N -counter +1);
+                short_offsets[0] = 0; 
+                for (int i = 1; i < 2*N -counter +1; i++){
+                    short_offsets[i] = n_dof;
+                }
+                short_offsets.PartialSum();
 
-            //     BlockVector mu_k(part_offsets); 
-            //     BlockVector phi_k(part_offsets); 
-            //     BlockVector phi_km2(part_offsets); 
-            //     BlockVector A42_phi_km2(part_offsets); 
+                Array<int> long_offsets(2*N -counter +2 +1);
+                long_offsets[0] = 0; 
+                for (int i = 1; i < 2*N -counter +2 +1; i++){
+                    long_offsets[i] = n_dof;
+                }
+                long_offsets.PartialSum();
 
-            //     A44 = new BlockOperator(part_offsets); 
-            //     A42 = new BlockOperator(part_offsets); 
+                BlockVector mu_k(short_offsets); 
+                BlockVector phi_k(short_offsets); 
+                BlockVector phi_km2(long_offsets); 
+                BlockVector A42_phi_km2(long_offsets); 
+
+                A44 = new BlockOperator(short_offsets); 
+                A42 = new BlockOperator(long_offsets); 
                 
-            //     // Load mu k 
-            //     for(int i=0; i < 2*N -counter; i++){
-            //         int z = counter - N + i;  
-            //         int k = N -i -1; 
-            //         // cout << N << " " << i << " " << z << " " << k << " " << z*N + k << endl;  
-            //         m->Mult(y.GetBlock(z*N+k), mu_k.GetBlock(i)); 
-            //     }
+                // Load mu k 
+                for(int i=0; i < 2*N -counter; i++){
+                    int z = counter - N + i;  
+                    int k = N -i -1; 
+                    // cout << N << " " << i << " " << z << " " << k << " " << z*N + k << endl;  
+                    m->Mult(y.GetBlock(z*N+k), mu_k.GetBlock(i)); 
+                }
                 
-            //     // Load phi km2 
-            //     for(int i=0; i < 2*N -counter +2; i++){
-            //         int z = counter -N -2 +i;                      
-            //         int k = N -i -1; 
-            //         // cout << i << " " << z << " " << k << " " << z*N + k << endl;  
-            //         m->Mult(x.GetBlock(z*N + k), phi_km2.GetBlock(i)); 
-            //     }
+                // Load phi km2 
+                for(int i=0; i < 2*N -counter +2; i++){
+                    int z = counter -N -2 +i;                      
+                    int k = N -i -1; 
+                    // cout << i << " " << z << " " << k << " " << z*N + k << endl;  
+                    phi_km2.GetBlock(i) = x.GetBlock(z*N + k); 
+                }
                 
-            //     // Load A_k,km2
-            //     for(int i=0; i < 2*N -counter; i++){ // loop rows 
-            //         for(int j=0; j < 2*N -counter +2; j++){ // loop columns             
-            //             int z_i = counter - N + i;  
-            //             int k_i = N -i -1; 
+                // Load A_k,km2
+                for(int i=0; i < 2*N -counter; i++){ // loop rows 
+                    for(int j=0; j < 2*N -counter +2; j++){ // loop columns             
+                        int z_i = counter - N + i;  
+                        int k_i = N -i -1; 
                         
-            //             int z_j = counter -N -2 +j;                      
-            //             int k_j = N -j -1;
+                        int z_j = counter -N -2 +j;                      
+                        int k_j = N -j -1;
 
-            //             // cout << "i " << i << ": " << z_i << " " << k_i << endl; 
-            //             // cout << "j " << j << ": " << z_j << " " << k_j << endl; 
-            //             // cout << (*A_entries)[z_i * N + k_i][z_j * N + k_j] << endl; 
+                        // cout << "i " << i << ": " << z_i << " " << k_i << endl; 
+                        // cout << "j " << j << ": " << z_j << " " << k_j << endl; 
+                        // cout << (*A_entries)[z_i * N + k_i][z_j * N + k_j] << endl; 
 
-            //             if((*A_entries)[z_i * N + k_i][z_j * N + k_j]){
-            //                 // cout << "A entries is true: " << z_i << " " << k_i << " " << z_j << " " << k_j << " " << endl; 
-            //                 A42->SetBlock(i,j,&(L_BO->GetBlock(z_i * N + k_i,z_j * N + k_j))); 
-            //             } 
-            //         }
-            //     }
+                        if((*A_entries)[z_i * N + k_i][z_j * N + k_j]){
+                            // cout << "A entries is true: " << z_i << " " << k_i << " " << z_j << " " << k_j << " " << endl; 
+                            A42->SetBlock(i,j,&(L_BO->GetBlock(z_i * N + k_i,z_j * N + k_j))); 
+                        } 
+                    }
+                }
+                // cout << "mu_k" << endl; 
+                // for(int i = 0; i < mu_k.Size() / 9; i++){
+                //     cout << i; 
+                //     for(int j = 0; j < 9; j++){
+                //     cout << " - " << mu_k[i*9+j]; 
+                //     }
+                //     cout << endl; 
+                // }      
 
-            //     // Compute A_4,2 phi 
-            //     A42->Mult(phi_km2, A42_phi_km2); 
-            //     mu_k -= A42_phi_km2; 
-            //     // TODO: I think this should be a minus 
+                // Compute A_4,2 phi 
+                A42->Mult(phi_km2, A42_phi_km2); 
+                mu_k -= A42_phi_km2; 
+                // TODO: I think this should be a minus 
 
-            //     // Load A_4,4
-            //     for(int i=0; i < 2*N - counter; i++){ // loop rows 
-            //         for(int j=0; j < 2*N - counter; j++){ // loop columns 
-            //             int z_i = counter - N + i;  
-            //             int k_i = N -i -1; 
-            //             int z_j = counter - N + i;  
-            //             int k_j = N -i -1; 
+                // cout << "A42_phi_km2" << endl; 
+                // for(int i = 0; i < A42_phi_km2.Size() / 9; i++){
+                //     cout << i; 
+                //     for(int j = 0; j < 9; j++){
+                //     cout << " - " << A42_phi_km2[i*9+j]; 
+                //     }
+                //     cout << endl; 
+                // }         
+
+                // cout << "mu_k-A42_phi_km2" << endl; 
+                // for(int i = 0; i < mu_k.Size() / 9; i++){
+                //     cout << i; 
+                //     for(int j = 0; j < 9; j++){
+                //     cout << " - " << mu_k[i*9+j]; 
+                //     }
+                //     cout << endl; 
+                // }      
+
+
+                // Load A_4,4
+                for(int i=0; i < 2*N - counter; i++){ // loop rows 
+                    for(int j=0; j < 2*N - counter; j++){ // loop columns 
+                        int z_i = counter - N + i;  
+                        int k_i = N -i -1; 
+                        int z_j = counter - N + j;  
+                        int k_j = N -j -1; 
                         
-            //             // cout << "i " << i << " " << z_i << " " << k_i << endl; 
-            //             // cout << "j " << j << " " << z_j << " " << k_j << endl; 
-            //             // cout << endl; 
+                        // cout << "i " << i << " " << z_i << " " << k_i << endl; 
+                        // cout << "j " << j << " " << z_j << " " << k_j << endl; 
+                        // cout << endl; 
 
-            //             if((*A_entries)[z_i * N + k_i][z_j * N + k_j]){
-            //                 A44->SetBlock(i,j,&(L_BO->GetBlock(z_i * N + k_i,z_j * N + k_j))); 
-            //             }
-            //         }
-            //     }
+                        if((*A_entries)[z_i * N + k_i][z_j * N + k_j]){
+                            // cout << "A entries is true: " << z_i << " " << k_i << " " << z_j << " " << k_j << " " << endl; 
+                            A44->SetBlock(i,j,&(L_BO->GetBlock(z_i * N + k_i,z_j * N + k_j))); 
+                        }
+                    }
+                }
                  
-            //     // Solve A44 ... 
-            //     A44_solver.SetOperator(*A44); 
-            //     A44_solver.Mult(mu_k, phi_k); 
+                // Solve A44 ... 
+                A44_solver.SetOperator(*A44); 
+                A44_solver.Mult(mu_k, phi_k); 
 
-            //     // Write phi_k 
-            //     for(int i=0; i < 2*N - counter; i++){
-            //         int z = counter - N + i;  
-            //         int k = N -i -1; 
-            //         // for (int j = 0; j < n_dof; j++){
-            //             // cout << phi_k.GetBlock(i)[j] << " " << x.GetBlock(z*N + k)[j] << endl; 
-            //         // }
-            //         x.GetBlock(z*N + k) = phi_k.GetBlock(i); 
-            //         // for (int j = 0; j < n_dof; j++){
-            //         //     cout << phi_k.GetBlock(i)[j] << " " << x.GetBlock(z*N + k)[j] << endl; 
-            //         // }
-            //         // cout << z << " " << k << " " << z*N + k << endl;  
-            //     }
-            // }
+                // Write phi_k 
+                for(int i=0; i < 2*N - counter; i++){
+                    int z = counter - N + i;  
+                    int k = N -i -1; 
+                    // for (int j = 0; j < n_dof; j++){
+                        // cout << phi_k.GetBlock(i)[j] << " " << x.GetBlock(z*N + k)[j] << endl; 
+                    // }
+                    x.GetBlock(z*N + k) = phi_k.GetBlock(i); 
+                    // for (int j = 0; j < n_dof; j++){
+                    //     cout << phi_k.GetBlock(i)[j] << " " << x.GetBlock(z*N + k)[j] << endl; 
+                    // }
+                    // cout << z << " " << k << " " << z*N + k << endl;  
+                }
 
-        }
-        cout << endl; 
-        cout << "x" << endl;
-        for(int i = 0; i < 9; i++){
-            cout << "i: " << i; 
-            for(int j = 0; j < 9; j++){
-                cout << " - " << x[i*9+j] ; 
+                // cout << "phi_k" << endl; 
+                // for(int i = 0; i < phi_k.Size() / 9; i++){
+                //     cout << i; 
+                //     for(int j = 0; j < 9; j++){
+                //     cout << " - " << phi_k[i*9+j]; 
+                //     }
+                //     cout << endl; 
+                // }           
             }
-            cout << endl; 
+
         }
-        cout << endl; 
+
+        // cout << endl; 
+        // cout << "x" << endl;
+        // for(int i = 0; i < x.Size()/9; i++){
+        //     cout << "i: " << i; 
+        //     for(int j = 0; j < 9; j++){
+        //         cout << " - " << x[i*9+j] ; 
+        //     }
+        //     cout << endl; 
+        // }
+        // cout << endl; 
     }
 
     void setup_coefficients(){
