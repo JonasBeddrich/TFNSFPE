@@ -622,9 +622,9 @@ double get_theta(double alpha, double dt){
     return theta * dt + get_w_infinity(alpha); 
 }
 
-double get_delta(double alpha, double dt){
-    double delta = 0; 
-    std::vector<double> weights = get_weights(alpha); 
-    std::for_each(weights.begin(), weights.end(), [&] (double d) {delta += d;}); 
-    return delta; 
-}
+// double get_delta(double alpha, double dt){
+//     double delta = 0; 
+//     std::vector<double> weights = get_weights(alpha); 
+//     std::for_each(weights.begin(), weights.end(), [&] (double d) {delta += d;}); 
+//     return delta; 
+// }

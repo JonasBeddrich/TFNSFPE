@@ -15,11 +15,15 @@
 #include <../../mfem-4.5/miniapps/navier/navier_solver.hpp>
 #include <../../mfem-4.5/miniapps/navier/navier_solver.cpp>
 
+#include <chrono>
+
 using namespace std;
+using namespace std::chrono;
 using namespace mfem;
 using namespace navier;
 
 int main(int argc, char *argv[]){
+    auto start = high_resolution_clock::now();
     Mpi::Init();
     Hypre::Init();
 
@@ -39,6 +43,10 @@ int main(int argc, char *argv[]){
     #endif
 
     #if defined(Experiment4)
+        *mesh = Mesh::MakeCartesian2D(2, 2, Element::Type::QUADRILATERAL);
+    #endif
+
+    #if defined(Experiment4_Medea)
         *mesh = Mesh::MakeCartesian2D(2, 2, Element::Type::QUADRILATERAL);
     #endif
 
@@ -124,8 +132,6 @@ int main(int argc, char *argv[]){
     ParGridFunction *u_ic = flowsolver.GetCurrentVelocity();
     VectorFunctionCoefficient u_IC_coeff(pmesh->Dimension(), u_IC);
     u_ic->ProjectCoefficient(u_IC_coeff);
-
-
     
     // Load initial conditions and fill psiM
     VectorFunctionCoefficient phi_psiM_coeff(vector_size, phi_psiM_function);
@@ -189,7 +195,7 @@ int main(int argc, char *argv[]){
     VectorSumCoefficient T_34(T_3, T_4);
 
     #if !defined(Experiment5_pres_C)
-    double scale_T = 1; 
+    double scale_T = 100; 
     VectorCoefficient *T = new VectorSumCoefficient(T_12,T_34,scale_T,scale_T);
     #endif 
 
@@ -237,6 +243,12 @@ int main(int argc, char *argv[]){
         ProductCoefficient chi_coeff(1.0, one_coeff);
         // ProductCoefficient xi_coeff(trace_C_coeff, trace_C_coeff);
         // ProductCoefficient chi_coeff(trace_C_coeff,trace_C_coeff);
+    #endif
+
+     #if defined(Experiment4_Medea)
+        ConstantCoefficient one_coeff(1.0);
+        ProductCoefficient xi_coeff(1.0, one_coeff);
+        ProductCoefficient chi_coeff(1.0, one_coeff);
     #endif
 
     #if defined(Experiment5_pres_u)
@@ -289,7 +301,7 @@ int main(int argc, char *argv[]){
 
     std::vector<double> gammas = get_gammas(alpha, dt);
     double beta = get_beta(alpha, dt);
-    double delta = get_delta(alpha, dt);
+    // double delta = get_delta(alpha, dt);
 
     for (auto i :weights){
         cout << i << " ";
@@ -310,7 +322,7 @@ int main(int argc, char *argv[]){
 
     std::vector<double> gammas_psi = get_gammas(1-alpha, dt);
     double beta_psi = get_beta(1-alpha, dt);
-    double delta_psi = get_delta(1-alpha, dt);
+    // double delta_psi = get_delta(1-alpha, dt);
 
     for (auto i :weights_psi){
         cout << i << " ";
@@ -441,11 +453,11 @@ int main(int argc, char *argv[]){
 
     cout << "Computing Initial Velocity field" << endl; 
     
-    // for (int i = 0; i < 100; i++){
-    //     cout << "Iteration: " << i << endl; 
-    //     double j=0; 
-    //     flowsolver.Step(j, 0.001, 0);
-    // }
+    for (int i = 0; i < 100; i++){
+        cout << "Iteration: " << i << endl; 
+        double j=0; 
+        flowsolver.Step(j, 0.001, 0);
+    }
 
     css.calculate_operators();
     pss.calculate_operators();
@@ -690,5 +702,8 @@ int main(int argc, char *argv[]){
 
     // Free the used memory.
     delete pd;
+    auto stop = high_resolution_clock::now();
+    auto duration = duration_cast<microseconds>(stop - start);
+    cout << "The simulation took " << duration.count()/1000000. << " seconds."<< endl;
     return 0;
 }

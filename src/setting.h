@@ -1,7 +1,8 @@
 // #define Experiment1
 // #define Experiment2
-#define Experiment3
+// #define Experiment3
 // #define Experiment4
+#define Experiment4_Medea
 // #define Experiment5_pres_u
 // #define Experiment5_pres_C
 // #define Experiment6
@@ -38,14 +39,14 @@ using namespace mfem;
 
 const int dim = 2;
 const int n_modes = 20; 
-const int N =30;
+const int N=3;
 const int vector_size = N*N;
 const double a = 0.5; // this is the one for the weighted hermite polynomials 
 
 /* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
 
-double dt = 0.1; 
-int plot_frequency = 1; 
+double dt = 0.001; 
+int plot_frequency = 100; 
 
 /* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
 
@@ -67,8 +68,8 @@ void u_IC(const Vector &x, double t, Vector &u){
 #endif 
 
 #if defined(Experiment2)
-const std::string scenario = "Exp2"; 
-double t_final = 10;
+const std::string scenario = "Exp2_uneven"; 
+double t_final = 60;
 const int n_refine = 0; 
 bool prescribed_velocity = true; 
 
@@ -134,6 +135,34 @@ void u_BC(const Vector &x, double t, Vector&u){
 //     u(0) = x(1) * x(1) * x(0); 
 //     u(1) = -x(0) * x(1) * x(0) ; 
 // }
+
+void u_IC(const Vector &x, double t, Vector &u){
+    // u(0) = x(0) * x(0) * (1-x(0)) * (1-x(0)); 
+    // u(1) = - x(0) * x(1) * (4 * x(0) * x(0) - 6 * x(0) + 2); 
+    u(0) = 0; 
+    u(1) = 0; 
+}
+#endif 
+
+#if defined(Experiment4_Medea)
+const std::string scenario = "Exp4_Medea_100"; 
+double t_final = 10;
+const char *mesh_file = "../src/test.mesh";
+const int n_refine = 6; 
+bool prescribed_velocity = false;
+
+// xi and chi are set depening on psi ... thus not defined here 
+const double nu = 1.; 
+const double eps = 1.; 
+
+void u_BC(const Vector &x, double t, Vector&u){
+    if (x(1) > 0.999999){ // top boundary 
+        u(0) = 0.1;
+    } else { // other boundaries 
+        u(0) = 0; 
+    }
+    u(1) = 0; 
+} 
 
 void u_IC(const Vector &x, double t, Vector &u){
     // u(0) = x(0) * x(0) * (1-x(0)) * (1-x(0)); 
@@ -263,7 +292,7 @@ void phi_psiM_function(const Vector &x, Vector &y){
         y(52) = -0.006464532119806319;
         y(54) = 0.004425962582168262;
     }
-
+    
     if (N==10){
         y(0) = 0.07957747154594769;
         y(2) = -0.042202327319864355;
@@ -1759,4 +1788,9 @@ void phi_psiM_function(const Vector &x, Vector &y){
         y(2446) = -1.2367982469940028e-08;
         y(2448) = 9.178853423325096e-09;
     }
+
+    for (int i = 1; i < vector_size; i++){
+        y(i) = y(i) * x(0) * x(1); 
+    }
+
 }
