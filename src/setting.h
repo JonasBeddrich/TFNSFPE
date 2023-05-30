@@ -1,8 +1,8 @@
 // #define Experiment1
 // #define Experiment2
-// #define Experiment3
+#define Experiment3
 // #define Experiment4
-#define Experiment4_Medea
+// #define Experiment4_Medea
 // #define Experiment5_pres_u
 // #define Experiment5_pres_C
 // #define Experiment6
@@ -148,7 +148,7 @@ void u_IC(const Vector &x, double t, Vector &u){
 const std::string scenario = "Exp4_Medea_100"; 
 double t_final = 10;
 const char *mesh_file = "../src/test.mesh";
-const int n_refine = 6; 
+const int n_refine = 2; 
 bool prescribed_velocity = false;
 
 // xi and chi are set depening on psi ... thus not defined here 

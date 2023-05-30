@@ -74,6 +74,7 @@ int main(int argc, char *argv[]){
         mesh = new Mesh(mesh_file);
     #endif
 
+    // create parallel mesh 
     auto *pmesh = new ParMesh(MPI_COMM_WORLD, *mesh);
     for (int i = 0; i < n_refine; i++){
         pmesh->UniformRefinement();
@@ -83,11 +84,27 @@ int main(int argc, char *argv[]){
     // Define the finite element and the finite element space
     H1_FECollection fec(1, dim);
     ParFiniteElementSpace fespace(pmesh, &fec); // scalar
-    ParFiniteElementSpace vfespace(pmesh, &fec, vector_size, Ordering::byNODES); // phi vector
     ParFiniteElementSpace v2dfespace(pmesh, &fec, 2, Ordering::byNODES); // 2D vector
+    ParFiniteElementSpace vfespace(pmesh, &fec, vector_size, Ordering::byNODES); // phi vector
     const int n_dof = fespace.GetVSize();
 
-    NavierSolver flowsolver(pmesh, 2, nu);
+    Array<int> vess_tdof_list;
+    Array<int> vess_bdr;
+    if (pmesh->bdr_attributes.Size())
+    {
+        vess_bdr.SetSize(pmesh->bdr_attributes.Max());
+        vess_bdr = 1;
+        vfespace.GetEssentialTrueDofs(vess_bdr, vess_tdof_list);
+    }
+
+    Array<int> ess_tdof_list;
+    Array<int> ess_bdr;
+    if (pmesh->bdr_attributes.Size())
+    {
+        ess_bdr.SetSize(pmesh->bdr_attributes.Max());
+        ess_bdr = 1;
+        fespace.GetEssentialTrueDofs(ess_bdr, ess_tdof_list);
+    }
 
     // Create offset vector for phi vector
     // i.e. indices where the next phi_ij starts
@@ -97,10 +114,6 @@ int main(int argc, char *argv[]){
         block_offsets[i] =  n_dof;
     }
     block_offsets.PartialSum();
-    
-    // cout << block_offsets[0] << endl; 
-    // cout << block_offsets[vector_size] << endl; 
-    // cout << block_offsets[vector_size+1] << endl; 
 
     // Blockvector for eta and psi 
     BlockVector phi_eta_block(block_offsets);
@@ -127,6 +140,9 @@ int main(int argc, char *argv[]){
     ParGridFunction phi_eta(&vfespace, phi_eta.GetData());
     ParGridFunction phi_psi0(&vfespace, phi_psi0_block.GetData());
     ParGridFunction phi_psiM(&vfespace, phi_psiM_block.GetData());
+
+    NavierSolver flowsolver(pmesh, 2, nu);
+
 
     // Velocity initial conditions
     ParGridFunction *u_ic = flowsolver.GetCurrentVelocity();
@@ -385,7 +401,7 @@ int main(int argc, char *argv[]){
     GridFunctionCoefficient d2u2_coeff(dyu2_gf); 
 
     // Configuration space solver
-    CSS css(fespace, phi_Fpsi0_block, phi_eta_modes, vector_size, block_offsets, u_gf_NS, chi_coeff, xi_coeff);
+    CSS css(fespace, phi_Fpsi0_block, phi_eta_modes, vector_size, block_offsets, u_gf_NS, chi_coeff, xi_coeff, vess_tdof_list);
 
     // Physical space solver
     PSS pss(fespace, phi_Fpsi0_block, phi_eta_modes, u_coeff, &t);
@@ -393,16 +409,18 @@ int main(int argc, char *argv[]){
     // Navier Stokes
     flowsolver.Setup(dt);
 
-    ParBilinearForm m(&fespace);
-    m.AddDomainIntegrator(new MassIntegrator);
-    m.Assemble();
+    ParBilinearForm M(&fespace);
+    M.AddDomainIntegrator(new MassIntegrator);
+    M.Assemble();
+    HypreParMatrix M_mat; 
+    M.FormSystemMatrix(ess_tdof_list, M_mat); 
 
     BiCGSTABSolver m_solver;
     m_solver.iterative_mode=false;
     m_solver.SetRelTol(1e-12);
     m_solver.SetMaxIter(1000);
     m_solver.SetPrintLevel(0);
-    m_solver.SetOperator(m);
+    m_solver.SetOperator(M_mat);
 
     // ****************************************************************
     // Output
@@ -453,7 +471,7 @@ int main(int argc, char *argv[]){
 
     cout << "Computing Initial Velocity field" << endl; 
     
-    for (int i = 0; i < 100; i++){
+    for (int i = 0; i < 1; i++){
         cout << "Iteration: " << i << endl; 
         double j=0; 
         flowsolver.Step(j, 0.001, 0);
@@ -470,7 +488,7 @@ int main(int argc, char *argv[]){
     cout << "Computing Initial Condition" << endl; 
     
     double dt_IC = 0.01; 
-    int plot_frequency_IC = 10; 
+    int plot_frequency_IC = 2; 
     t = 0.0; 
     tmp = 0.0; 
     done = false; 

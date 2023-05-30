@@ -14,12 +14,19 @@ private:
     double *t; 
 
     ConstantCoefficient* eps_coeff; 
+    ProductCoefficient* beta_eps_coeff; 
     VectorGridFunctionCoefficient &u_coeff; 
 
     ParFiniteElementSpace &fespace; 
-    ParBilinearForm* m; 
+    Array<int> ess_tdof_list;
+
+    ParBilinearForm* M; 
     ParBilinearForm* Fx; 
-    SparseMatrix* M_m_beta_Fx; 
+    ParBilinearForm* M_m_beta_Fx;
+
+    HypreParMatrix M_mat;  
+    HypreParMatrix Fx_mat;  
+    HypreParMatrix M_m_beta_Fx_mat;  
     
     BlockVector &phi0; 
     std::vector<BlockVector> &phi_modes; 
@@ -38,57 +45,39 @@ public:
         u_coeff(u_coeff_), 
         t(t_){
         
+        Array<int> ess_bdr(fespace.GetParMesh()->bdr_attributes.Max());
+        ess_bdr = 1;
+        fespace.GetEssentialTrueDofs(ess_bdr, ess_tdof_list);
+
         // weights for rational approximation 
         beta = get_beta(alpha, dt); 
         gammas = get_gammas(alpha, dt); 
         
         // mass matrix 
-        m = new ParBilinearForm(&fespace);
-        m->AddDomainIntegrator(new MassIntegrator); 
-        m->Assemble(); 
- 
-        // coefficients for the physical space operator 
-        // eps_coeff = new ConstantCoefficient(eps); 
+        M = new ParBilinearForm(&fespace);
+        M->AddDomainIntegrator(new MassIntegrator); 
+        M->Assemble(); 
+        M->FormSystemMatrix(ess_tdof_list, M_mat);  
+
+        // constant diffusion coefficient 
         eps_coeff = new ConstantCoefficient(-1.0 * eps); 
         
         calculate_operators(); 
     }
 
     void apply_Fx(const Vector &a, Vector &b) const{
-        Fx->Mult(a,b);
+        Fx_mat.Mult(a,b);
     }
 
     // This method solves (Id - beta Fx) x = y 
     void solve_Id_minus_beta_Fx(const Vector &y, Vector &x){
         // calculates x = (Id - beta Fx)^-1 M*y 
-        
+
         // z = M*y 
-        m->Mult(y,z); 
+        M_mat.Mult(y,z); 
         
         // x = (Id - beta Fx)^-1 z  
         pss_solver.Mult(z, x); 
-
-        // for (int l = 0; l < n_modes; l++){    
-        //     m->Mult(phi_modes[l].GetBlock(current_block), tmp);    
-        //     z.Add(gammas[l], tmp); 
-        // } 
-
-        // // This function solves (Id-beta Fx)^-1  
-        // // cout << "t: " << *t << endl; 
-        // // accumulate phi_0 and modes in z
-        // m->Mult(phi0.GetBlock(current_block), z);
-        // for (int l = 0; l < n_modes; l++){    
-        //     m->Mult(phi_modes[l].GetBlock(current_block), tmp);    
-        //     z.Add(gammas[l], tmp); 
-        // }
-
-        // // solver for phi^n+1
-        // pss_solver.Mult(z, tmp); 
-
-        // // calculate update 
-        // phi_up = tmp; 
-        // phi_up.Add(-1.0, phi_old); 
-        // phi_up /= dt; 
     }
     
     void set_current_block(int i){
@@ -96,22 +85,29 @@ public:
     }
 
     void calculate_operators(){
-        // physical space operator        
+        beta_eps_coeff = new ProductCoefficient(-beta, *eps_coeff); 
+
+        // rhs        
         Fx = new ParBilinearForm(&fespace); 
         Fx->AddDomainIntegrator(new DiffusionIntegrator(*eps_coeff)); 
         Fx->AddDomainIntegrator(new ConvectionIntegrator(u_coeff)); 
-        Fx->Assemble(); 
-        
-        // left side operator 
-        M_m_beta_Fx = new SparseMatrix(m->SpMat());
-        M_m_beta_Fx->Add(- beta, Fx->SpMat()); 
+        Fx->Assemble();
+        Fx->FormSystemMatrix(ess_tdof_list, Fx_mat);  
 
-        // set up solver 
+        // lhs 
+        M_m_beta_Fx = new ParBilinearForm(&fespace); 
+        M_m_beta_Fx->AddDomainIntegrator(new MassIntegrator); 
+        M_m_beta_Fx->AddDomainIntegrator(new ConvectionIntegrator(u_coeff, -beta)); 
+        M_m_beta_Fx->AddDomainIntegrator(new DiffusionIntegrator(*beta_eps_coeff)); 
+        M_m_beta_Fx->Assemble(); 
+        M_m_beta_Fx->FormSystemMatrix(ess_tdof_list, M_m_beta_Fx_mat); 
+
+        // solver 
         pss_solver.iterative_mode = false;
         pss_solver.SetRelTol(1e-12);
         pss_solver.SetMaxIter(1000);
         pss_solver.SetPrintLevel(0);
-        pss_solver.SetOperator(*M_m_beta_Fx); 
+        pss_solver.SetOperator(M_m_beta_Fx_mat); 
     }
 
     void set_beta(double beta_){
