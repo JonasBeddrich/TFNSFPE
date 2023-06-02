@@ -40,8 +40,8 @@ public:
         fespace(fespace_),                    
         phi0(phi0_),
         phi_modes(phi_modes_), 
-        z(fespace_.GetVSize()), 
-        tmp(fespace_.GetVSize()),
+        z(fespace_.TrueVSize()), 
+        tmp(fespace_.TrueVSize()),
         u_coeff(u_coeff_), 
         t(t_){
         

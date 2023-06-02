@@ -24,7 +24,9 @@ using namespace navier;
 
 int main(int argc, char *argv[]){
     auto start = high_resolution_clock::now();
-    Mpi::Init();
+    Mpi::Init(argc, argv);
+    int num_procs = Mpi::WorldSize();
+    int myid = Mpi::WorldRank();
     Hypre::Init();
 
     Mesh *mesh = new Mesh();
@@ -86,7 +88,9 @@ int main(int argc, char *argv[]){
     ParFiniteElementSpace fespace(pmesh, &fec); // scalar
     ParFiniteElementSpace v2dfespace(pmesh, &fec, 2, Ordering::byNODES); // 2D vector
     ParFiniteElementSpace vfespace(pmesh, &fec, vector_size, Ordering::byNODES); // phi vector
-    const int n_dof = fespace.GetVSize();
+    const int n_dof = fespace.GetTrueVSize();
+
+    cout << n_dof << endl; 
 
     Array<int> vess_tdof_list;
     Array<int> vess_bdr;
@@ -96,6 +100,11 @@ int main(int argc, char *argv[]){
         vess_bdr = 1;
         vfespace.GetEssentialTrueDofs(vess_bdr, vess_tdof_list);
     }
+
+            
+    ParBilinearForm *n(new ParBilinearForm(&fespace)); 
+    cout << "n " << n->NumCols() << " " << n->NumRows() << " " << fespace.GlobalVSize() << " "
+    << fespace.GlobalTrueVSize() << " " << fespace.GetTrueVSize() << endl; 
 
     Array<int> ess_tdof_list;
     Array<int> ess_bdr;
@@ -114,6 +123,10 @@ int main(int argc, char *argv[]){
         block_offsets[i] =  n_dof;
     }
     block_offsets.PartialSum();
+    
+    for (int i = 1; i < vector_size + 1; i++){
+        cout << i << " " << block_offsets[i] << endl; 
+    }
 
     // Blockvector for eta and psi 
     BlockVector phi_eta_block(block_offsets);

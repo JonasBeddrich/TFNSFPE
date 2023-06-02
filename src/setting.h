@@ -1,7 +1,7 @@
 // #define Experiment1
 // #define Experiment2
-#define Experiment3
-// #define Experiment4
+// #define Experiment3
+#define Experiment4
 // #define Experiment4_Medea
 // #define Experiment5_pres_u
 // #define Experiment5_pres_C
@@ -46,7 +46,7 @@ const double a = 0.5; // this is the one for the weighted hermite polynomials
 /* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
 
 double dt = 0.001; 
-int plot_frequency = 100; 
+int plot_frequency = 1; 
 
 /* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
 
