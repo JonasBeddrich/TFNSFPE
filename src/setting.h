@@ -1,10 +1,11 @@
 // #define Experiment1
 // #define Experiment2
 // #define Experiment3
-#define Experiment4
+// #define Experiment4
 // #define Experiment5_pres_u
 // #define Experiment5_pres_C
 // #define Experiment6
+#define Experiment7
 
 #define calculate_initial_condition
 
@@ -28,7 +29,7 @@
 
 /* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
 
-const double alpha = 0.8; 
+const double alpha = 1.; 
 const std::string tf_degree = "alpha=" + std::to_string(alpha); 
 
 /* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
@@ -38,14 +39,14 @@ using namespace mfem;
 
 const int dim = 2;
 const int n_modes = 20; 
-const int N = 10;
+const int N = 4;
 const int vector_size = N*N;
 const double a = 0.5; // this is the one for the weighted hermite polynomials 
 
 /* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
 
 double dt = 0.001; 
-int plot_frequency = 100; 
+int plot_frequency = 10; 
 
 /* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
 
@@ -211,6 +212,34 @@ void u_IC(const Vector &x, double t, Vector &u){
 }
 
 #endif 
+
+#if defined(Experiment7)
+const std::string scenario = "Exp7"; 
+double t_final = 4;
+const char *mesh_file = "../src/half_channel_ref1.msh";
+const int n_refine = 1; 
+bool prescribed_velocity = false; 
+
+// xi and chi are set depening on psi ... thus not defined here 
+const double nu = 0.59; 
+const double eps = 1.; 
+
+void u_BC(const Vector &x, double t, Vector&u){
+    u(0) = 0; 
+    u(1) = 0; 
+
+    if(x(0) < 1e-8 || x(0) > 3 - 1e-8){
+        u(0) = 0.25 * x(1) * (1-x(1)); 
+    } 
+}
+
+void u_IC(const Vector &x, double t, Vector &u){
+    u(0) = 0; 
+    u(1) = 0; 
+}
+
+#endif 
+
 
 /* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
 // for some tests
