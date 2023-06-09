@@ -11,8 +11,6 @@ private:
     double beta; 
     std::vector<double> gammas; 
 
-    double *t; 
-
     ConstantCoefficient* eps_coeff; 
     ConstantCoefficient* m_1o_beta_coeff; 
     VectorGridFunctionCoefficient &u_coeff; 
@@ -34,14 +32,13 @@ private:
     mutable Vector z, tmp; 
 
 public: 
-    PSS(ParFiniteElementSpace &fespace_, BlockVector &phi0_, std::vector<BlockVector> &phi_modes_, VectorGridFunctionCoefficient &u_coeff_, double *t_):  
+    PSS(ParFiniteElementSpace &fespace_, BlockVector &phi0_, std::vector<BlockVector> &phi_modes_, VectorGridFunctionCoefficient &u_coeff_):  
         fespace(fespace_),                    
         phi0(phi0_),
         phi_modes(phi_modes_), 
         z(fespace_.GetVSize()), 
         tmp(fespace_.GetVSize()),
         u_coeff(u_coeff_), 
-        t(t_), 
         pss_solver(MPI_COMM_WORLD){
         
         // weights for rational approximation 
@@ -85,7 +82,6 @@ public:
         // } 
 
         // // This function solves (Id-beta Fx)^-1  
-        // // cout << "t: " << *t << endl; 
         // // accumulate phi_0 and modes in z
         // m->Mult(phi0.GetBlock(current_block), z);
         // for (int l = 0; l < n_modes; l++){    

@@ -7,10 +7,13 @@
 #include <functional>
 
 #include <setting.h>
-#include <rational_approximation.h>
-#include <finite_difference_scheme.h>
-#include <PhysicalSpaceSolver.h>
-#include <ConfigurationSpaceSolver.h>
+#include <resources/experiments.h>
+#include <resources/experiment7.h>
+#include <resources/initialConditions.h>
+#include <resources/rational_approximation.h>
+#include <operators/finite_difference_scheme.h>
+#include <operators/PhysicalSpaceSolver.h>
+#include <operators/ConfigurationSpaceSolver.h>
 
 #include <../../mfem-4.5/miniapps/navier/navier_solver.hpp>
 #include <../../mfem-4.5/miniapps/navier/navier_solver.cpp>
@@ -27,58 +30,61 @@ int main(int argc, char *argv[]){
     Mpi::Init(argc, argv);
     int num_procs = Mpi::WorldSize();
     int myid = Mpi::WorldRank();
+    bool verbose = myid == 0; 
     Hypre::Init();
 
     Mesh *mesh = new Mesh();
-    *mesh = Mesh::MakeCartesian2D(4, 4, Element::QUADRILATERAL);
+    mesh = new Mesh(mesh_file);  
 
-    #if defined(Experiment1)
-        *mesh = Mesh::MakeCartesian2D(8, 8, Element::Type::QUADRILATERAL);
-    #endif
+    // // *mesh = Mesh::MakeCartesian2D(4, 4, Element::QUADRILATERAL);
 
-    #if defined(Experiment2)
-        *mesh = Mesh::MakeCartesian2D(8, 8, Element::Type::QUADRILATERAL);
-    #endif
+    // #if defined(Experiment1)
+    //     *mesh = Mesh::MakeCartesian2D(8, 8, Element::Type::QUADRILATERAL);
+    // #endif
 
-    #if defined(Experiment3)
-        *mesh = Mesh::MakeCartesian2D(8, 8, Element::Type::QUADRILATERAL);
-    #endif
+    // #if defined(Experiment2)
+    //     *mesh = Mesh::MakeCartesian2D(8, 8, Element::Type::QUADRILATERAL);
+    // #endif
 
-    #if defined(Experiment4)
-        *mesh = Mesh::MakeCartesian2D(2, 2, Element::Type::QUADRILATERAL);
-    #endif
+    // #if defined(Experiment3)
+    //     *mesh = Mesh::MakeCartesian2D(8, 8, Element::Type::QUADRILATERAL);
+    // #endif
 
-    #if defined(Experiment4_Medea)
-        *mesh = Mesh::MakeCartesian2D(2, 2, Element::Type::QUADRILATERAL);
-    #endif
+    // // #if defined(Experiment4)
+    // //     *mesh = Mesh::MakeCartesian2D(2, 2, Element::Type::QUADRILATERAL);
+    // // #endif
 
-    #if defined(Experiment5_pres_u)
-        Mesh square = Mesh::MakeCartesian2D(10, 10, Element::QUADRILATERAL);
-        square.Save("Exp5_non_periodic.mesh");
-        Vector left_right_translation({1.0, 0.0});
-        std::vector<Vector> translations = {left_right_translation};
-        *mesh = Mesh::MakePeriodic(square, square.CreatePeriodicVertexMapping(translations));
-        mesh->RemoveInternalBoundaries();
-        mesh->Save("Exp5_periodic.mesh");
-    #endif
+    // #if defined(Experiment4_Medea)
+    //     *mesh = Mesh::MakeCartesian2D(2, 2, Element::Type::QUADRILATERAL);
+    // #endif
 
-    #if defined(Experiment5_pres_C)
-        Mesh square = Mesh::MakeCartesian2D(10, 10, Element::QUADRILATERAL);
-        square.Save("Exp5_non_periodic.mesh");
-        Vector left_right_translation({1.0, 0.0});
-        std::vector<Vector> translations = {left_right_translation};
-        *mesh = Mesh::MakePeriodic(square, square.CreatePeriodicVertexMapping(translations));
-        mesh->RemoveInternalBoundaries();
-        mesh->Save("Exp5_periodic.mesh");
-    #endif
+    // #if defined(Experiment5_pres_u)
+    //     Mesh square = Mesh::MakeCartesian2D(10, 10, Element::QUADRILATERAL);
+    //     square.Save("Exp5_non_periodic.mesh");
+    //     Vector left_right_translation({1.0, 0.0});
+    //     std::vector<Vector> translations = {left_right_translation};
+    //     *mesh = Mesh::MakePeriodic(square, square.CreatePeriodicVertexMapping(translations));
+    //     mesh->RemoveInternalBoundaries();
+    //     mesh->Save("Exp5_periodic.mesh");
+    // #endif
 
-    #if defined(Experiment6)
-        mesh = new Mesh(mesh_file);
-    #endif
+    // #if defined(Experiment5_pres_C)
+    //     Mesh square = Mesh::MakeCartesian2D(10, 10, Element::QUADRILATERAL);
+    //     square.Save("Exp5_non_periodic.mesh");
+    //     Vector left_right_translation({1.0, 0.0});
+    //     std::vector<Vector> translations = {left_right_translation};
+    //     *mesh = Mesh::MakePeriodic(square, square.CreatePeriodicVertexMapping(translations));
+    //     mesh->RemoveInternalBoundaries();
+    //     mesh->Save("Exp5_periodic.mesh");
+    // #endif
 
-    #if defined(Experiment7)
-        mesh = new Mesh(mesh_file);
-    #endif
+    // #if defined(Experiment6)
+    //     mesh = new Mesh(mesh_file);
+    // #endif
+
+    // #if defined(Experiment7)
+    //     mesh = new Mesh(mesh_file);
+    // #endif
 
     auto *pmesh = new ParMesh(MPI_COMM_WORLD, *mesh);
     for (int i = 0; i < n_refine; i++){
@@ -349,17 +355,6 @@ int main(int argc, char *argv[]){
 
     std::vector<double> gammas = get_gammas(alpha, dt);
     double beta = get_beta(alpha, dt);
-    // double delta = get_delta(alpha, dt);
-
-    for (auto i :weights){
-        cout << i << " ";
-    }
-    cout << endl;
-
-    for (auto i :gammas){
-        cout << i << " ";
-    }
-    cout << endl;
 
     // ****************************************************************
     // Rational Approximation to compute psi 
@@ -370,25 +365,9 @@ int main(int argc, char *argv[]){
 
     std::vector<double> gammas_psi = get_gammas(1-alpha, dt);
     double beta_psi = get_beta(1-alpha, dt);
-    // double delta_psi = get_delta(1-alpha, dt);
-
-    for (auto i :weights_psi){
-        cout << i << " ";
-    }
-    cout << endl;
-
-    for (auto i :gammas_psi){
-        cout << i << " ";
-    }
-    cout << endl;
-
+   
     // ****************************************************************
     // Setup of the simulation
-
-    double t = 0.0;
-    int iteration_counter; 
-    double tmp = 0.0;
-    bool done = false;
 
     Vector tmp_vector(n_true_dof);
     BlockVector tmp_block_vector(true_block_offsets);
@@ -406,11 +385,10 @@ int main(int argc, char *argv[]){
 
     // ****************************************************************
     // Use a prescribed velocity 
-    // TODO: Make this as a define statement
     VectorFunctionCoefficient u_prescribed_coeff(dim, u_IC);
-    if(prescribed_velocity){
+    #if defined(prescribed_velocity)
         u_gf_NS->ProjectCoefficient(u_prescribed_coeff);
-    }
+    #endif 
 
     // ****************************************************************
     // Visualization of the gradient of u 
@@ -436,7 +414,7 @@ int main(int argc, char *argv[]){
     CSS css(fespace, phi_Fpsi0_true_block, phi_eta_true_modes, vector_size, true_block_offsets, u_gf_NS, chi_coeff, xi_coeff);
 
     // Physical space solver
-    PSS pss(fespace, phi_Fpsi0_true_block, phi_eta_true_modes, u_coeff, &t);
+    PSS pss(fespace, phi_Fpsi0_true_block, phi_eta_true_modes, u_coeff);
 
     // Navier Stokes
     flowsolver.Setup(dt);
@@ -474,89 +452,100 @@ int main(int argc, char *argv[]){
     pd->RegisterField("_C12", C12_gf);
     pd->RegisterField("_C22", C22_gf);
 
-   
+    
     // ****************************************************************
-    // Calculating initial conditions 
+    // Calculate initial conditions - velocity field  
 
 #if defined(calculate_initial_velocity_field)
 
-    // ****************************************************************
-    // Velocity field 
-
-    cout << "Computing Initial Velocity field" << endl; 
-    
-    for (int i = 0; i < 1; i++){
-        cout << "Iteration: " << i << endl; 
-        double j=0; 
-        flowsolver.Step(j, 0.001, 0);
+    if(verbose){
+        cout << "" << endl; 
+        cout << ">>> COMPUTING INITIAL VELOCITY FIELD <<<" << endl; 
     }
 
+    for (int i = 0; i < n_iter_IC_vel; i++){
+        if(verbose){
+            cout << endl; 
+            cout << "Iteration: " << i << endl; 
+        }
+        double j=0; 
+        flowsolver.Step(j, dt_IC_vel, 0);
+    }
+    
+    if(verbose){
+        cout << endl; 
+        cout << "Recalculate operators for initial velocity field" << endl; 
+    }
+    
+    // calculate the operators update the operators for the new velocity field 
     css.calculate_operators();
     pss.calculate_operators();
 
-    cout << "Inital Velocity field done" << endl; 
-
 #endif 
+    
+    // ****************************************************************
+    // Calculate initial conditions - probability density  
+
+    int ti_total = 0; 
 
 #if defined(calculate_initial_condition)
 
-    // ****************************************************************
-    // Calculating psi0  
-
-    std::ofstream outstream1;
-    // outstream1.open("phi_psi0_2");
-    // outstream1 << phi_psi0.Size() << endl; 
-    // phi_psi0.Print(outstream1);
-    // outstream1.close();
-
-
-    cout << "Computing Initial Condition" << endl; 
+    if(verbose){
+        cout << "" << endl; 
+        cout << ">>> COMPUTING INITIAL CONDITION FOR PSI <<<" << endl; 
+        cout << "" << endl; 
+    }
     
-    double dt_IC = 0.01; 
-    int plot_frequency_IC = 2; 
-    t = 0.0; 
-    tmp = 0.0; 
-    done = false; 
+    int ti_IC = 0; 
+    double t_IC = 0.0; 
+    bool done_IC = false; 
 
-    // Set the CSS to the integer-order problem (Id - dt * FR)
+    // Set operators to the integer-order problem (Id - dt * F)
     css.set_theta(dt_IC); 
     pss.set_beta(dt_IC); 
     
-    double t_IC = 5; 
-    for (int ti = 0; !done; ){
-        if(ti % plot_frequency_IC == 0){
-            pd->SetCycle(iteration_counter);
-            pd->SetTime(-(t_IC - t));
+    for (int ti_IC = 0; !done_IC; ){
+        if(ti_IC % plot_frequency_IC == 0){
+            pd->SetCycle(ti_total);
+            pd->SetTime(-(t_final_IC - t_IC));
             pd->Save();
         }
 
-        cout << "t: " << t << "s / " << t_IC << "s - dt: " << dt_IC << endl;
-        
-        css.solve_Id_minus_theta_FR(phi_psi0_block, tmp_block_vector);        
-        
+        if(verbose){
+            cout << "t: " << t_IC << "s / " << t_final_IC << "s - dt: " << dt_IC << endl;
+        }        
+
+        css.solve_Id_minus_theta_FR(phi_psi0_block, tmp_block_vector);                
         for(int i = 0; i < vector_size; i++){
             pss.solve_Id_minus_beta_Fx(tmp_block_vector.GetBlock(i), phi_psi0_block.GetBlock(i)); 
         }
         
         phi_psi_block = phi_psi0_block; 
 
-        t += dt_IC; 
-        ti++;
-        iteration_counter++;         
+        t_IC += dt_IC; 
+        ti_IC++;
+        ti_total++;         
         
-        done = (t >= t_IC - 1e-8 * dt_IC);
+        done_IC = (t_final_IC <= t_IC + 1e-8 * dt_IC);
     }
 
-    cout << "Initial Condition stored" << endl; 
+    if(verbose){
+        cout << endl; 
+        cout << "Store initial condition for psi, "; 
+    }
 
     std::ofstream outstream;
     outstream.open("Initial_Condition");
     outstream << phi_psi0_block.Size() << endl; 
     phi_psi0_block.Print(outstream);
     outstream.close();  
+
+    if(verbose){
+        cout << "reset operators" << endl; 
+        cout << endl; 
+    }
     
-    // Reset the CSS to the fractional problem
-    // (Id - theta * FR)
+    // Reset the CSS to the fractional problem (Id - theta * F)
     css.reset_theta(); 
     pss.reset_beta(); 
 
@@ -569,26 +558,32 @@ int main(int argc, char *argv[]){
     // inputstream.close(); 
     // phi_psi_block = phi_psi0_block; 
 
-    // cout << "Write output: Initial Condition" << endl; 
-    
-    // pd->SetCycle(cycle);
-    // pd->SetTime(testtime);
-    // pd->Save();
-
-    cout << "start loop" << endl; 
-
     // ****************************************************************
     // Time loop
 
-    t = 0.0; 
-    tmp = 0.0; 
-    done = false; 
+    double t = 0.0;
+    bool done = false; 
+
+    if(verbose){
+        cout << ">>> WRITE INITIAL CONDITIONS <<<" << endl; 
+        cout << "" << endl; 
+    }
+
+    pd->SetCycle(ti_total);
+    pd->SetTime(t);
+    pd->Save();
+
+    if(verbose){
+        cout << ">>> START TIME LOOP <<<" << endl; 
+        cout << "" << endl; 
+    }
     
     for (int ti = 0; !done; ){
-    // for (int ti = 0; ti < 2;){
         
-        cout << "t: " << t << "s / " << t_final << "s - dt: " << dt << endl;
-        
+        if(verbose){
+            cout << "t: " << t << "s / " << t_final << "s - dt: " << dt << endl;
+        }
+
         // ****************************************************************
         // Calculate F(psi0) 
 
@@ -607,7 +602,6 @@ int main(int argc, char *argv[]){
         }
         phi_Fpsi0_true_block = tmp_block_vector; 
 
-        // ****************************************************************
         // ****************************************************************
         // Solve the configuration space problem 
         
@@ -632,7 +626,6 @@ int main(int argc, char *argv[]){
             phi_eta_true_modes[l].Add(dt * weights[l], phi_FR_true_block);
         }
 
-        // ****************************************************************
         // ****************************************************************
         // Solve the physical space problem  
 
@@ -661,14 +654,12 @@ int main(int argc, char *argv[]){
             phi_eta_true_modes[l] *= gammas[l];  
         }
 
-        // TODO: Make this a defined statement 
-        if(!prescribed_velocity){
-            flowsolver.Step(t, dt, ti);
-        } else {
-            t += dt; 
-        }
 
-#if defined(calculate_psi_from_eta)
+        #if defined(prescribed_velocity)
+            flowsolver.Step(t, dt, ti);
+        #else 
+            t += dt; 
+        #endif 
 
         // ****************************************************************
         // Calculate psi from eta  
@@ -685,7 +676,6 @@ int main(int argc, char *argv[]){
         // psi inf 
         phi_psi_true_block = phi_eta_true_block; 
         phi_psi_true_block *= w_inf_psi; 
-
         // psi 0 
         phi_psi_true_block += phi_psi0_true_block; 
         // psi k 
@@ -693,29 +683,29 @@ int main(int argc, char *argv[]){
             phi_psi_true_block += phi_psi_true_modes[l]; 
         }
 
-#endif 
-        
+        // ****************************************************************
         // Check if done 
+        
         done = (t >= t_final - 1e-8 * dt);
 
         // ****************************************************************
         // Prepare operators for next iteration 
+        
         if(!done){
             css.calculate_operators();
             pss.calculate_operators();
         }
 
         // ****************************************************************
-        // Output 
+        // Load output 
 
-        // Distribute true_dofs to ParGridFunctions 
         for(int i = 0; i < vector_size; i++){
             phis_eta[i].Distribute(phi_eta_true_block.GetBlock(i)); 
             phis_psi[i].Distribute(phi_psi_true_block.GetBlock(i)); 
             phis_Fpsi0[i].Distribute(phi_Fpsi0_true_block.GetBlock(i)); 
         }
 
-        // Calculate the derivatives of u 
+        // Calculate the derivatives of u for the output 
         u_gf_NS->GetDerivative(1,0,*dxu1_gf); 
         u_gf_NS->GetDerivative(1,1,*dyu1_gf); 
         u_gf_NS->GetDerivative(2,0,*dxu2_gf); 
@@ -734,17 +724,23 @@ int main(int argc, char *argv[]){
         C12_gf->ProjectCoefficient(*C12_coeff);
         C22_gf->ProjectCoefficient(*C22_coeff);
 
-        // Advance iteration counter and write output
+        // Advance iteration counters and write output
         ti++;
-        iteration_counter++; 
+        ti_total++; 
         if(ti % plot_frequency == 0){
-            pd->SetCycle(iteration_counter);
+            pd->SetCycle(ti_total);
             pd->SetTime(t);
             pd->Save();
         }        
     }
 
     cout << "t: " << t << "s / " << t_final << "s" << endl;
+
+    if(verbose){
+        cout << "" << endl; 
+        cout << ">>> SIMULATION FINISHED <<<" << endl; 
+        cout << "" << endl; 
+    }
 
     // Free the used memory.
     delete pd;
@@ -753,5 +749,6 @@ int main(int argc, char *argv[]){
     auto stop = high_resolution_clock::now();
     auto duration = duration_cast<microseconds>(stop - start);
     cout << "The simulation took " << duration.count()/1000000. << " seconds."<< endl;
+
     return 0;
 }
