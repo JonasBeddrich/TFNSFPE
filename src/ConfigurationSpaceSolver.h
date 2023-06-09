@@ -42,10 +42,9 @@ private:
     HypreParMatrix A_BO_mat; 
     HypreParMatrix L_BO_mat; 
 
-    HypreParMatrix* mHPM; 
-    HypreParMatrix* m0HPM; 
+    HypreParMatrix* m_HPM; 
+    HypreParMatrix* m0_HPM; 
 
-    Array<int> vess_tdof_list; 
 
     ProductCoefficient &chi_coeff, &xi_coeff; 
     GridFunctionCoefficient *d1u1_coeff, *d1u2_coeff, *d2u1_coeff, *d2u2_coeff; 
@@ -53,15 +52,14 @@ private:
     ProductCoefficient *a_a_2_chi_coeff; 
     ConstantCoefficient *m0_coeff;
 
-    BiCGSTABSolver css_solver;
+    MINRESSolver css_solver;
     BiCGSTABSolver A44_solver;
     mutable Vector z, tmp, test;
 
 public:
 
     CSS(ParFiniteElementSpace &fespace_, BlockVector &phi0_, std::vector<BlockVector> &phi_modes_, int vector_size_, 
-    const Array<int> &offsets_, ParGridFunction *u_gf_NS_, ProductCoefficient &chi_coeff_, ProductCoefficient &xi_coeff_, 
-    Array<int> &vess_tdof_list_): 
+    const Array<int> &offsets_, ParGridFunction *u_gf_NS_, ProductCoefficient &chi_coeff_, ProductCoefficient &xi_coeff_): 
         z(fespace_.GetTrueVSize() * vector_size_), 
         tmp(fespace_.GetTrueVSize() * vector_size_), 
         test(fespace_.GetTrueVSize() * vector_size_), 
@@ -74,7 +72,7 @@ public:
         u_gf_NS(u_gf_NS_), 
         chi_coeff(chi_coeff_), 
         xi_coeff(xi_coeff_), 
-        vess_tdof_list(vess_tdof_list_){
+        css_solver(MPI_COMM_WORLD){
 
         M_BO = new BlockOperator(offsets_); 
         A_BO = new BlockOperator(offsets_); 
@@ -88,8 +86,8 @@ public:
         ConstantCoefficient *ptr_0_coeff = new ConstantCoefficient(0.); 
         coeff_matrix = new std::vector<std::vector<Coefficient*>>(vector_size, std::vector<Coefficient*>(vector_size, ptr_0_coeff)); 
         
-        A_SpMat = new std::vector<std::vector<HypreParMatrix>>(vector_size, std::vector<HypreParMatrix>(vector_size,*m0HPM));
-        L_SpMat = new std::vector<std::vector<HypreParMatrix>>(vector_size, std::vector<HypreParMatrix>(vector_size,*m0HPM));        
+        A_SpMat = new std::vector<std::vector<HypreParMatrix>>(vector_size, std::vector<HypreParMatrix>(vector_size,*m0_HPM));
+        L_SpMat = new std::vector<std::vector<HypreParMatrix>>(vector_size, std::vector<HypreParMatrix>(vector_size,*m0_HPM));        
 
         calculate_operators(); 
     }
@@ -552,18 +550,19 @@ public:
         m->AddDomainIntegrator(new MassIntegrator); 
         m->Assemble(); 
         m->Finalize(); 
-        mHPM = m->ParallelAssemble(); 
+        m_HPM = m->ParallelAssemble(); 
 
         for(int i = 0; i < vector_size; i++){
-            M_BO->SetBlock(i, i, mHPM); 
+            M_BO->SetBlock(i, i, m_HPM); 
         }
 
-        m0 = new ParBilinearForm(&fespace);
+        
         m0_coeff = new ConstantCoefficient(0.);
+        m0 = new ParBilinearForm(&fespace);
         m0->AddDomainIntegrator(new MassIntegrator(*m0_coeff)); 
         m0->Assemble(); 
         m0->Finalize(); 
-        m0HPM = m0->ParallelAssemble(); 
+        m0_HPM = m0->ParallelAssemble(); 
 
         u_fec = u_gf_NS->ParFESpace()->FEColl(); 
         u_fes = new ParFiniteElementSpace(u_gf_NS->ParFESpace()->GetParMesh(), u_fec, 1); 
@@ -629,7 +628,7 @@ public:
                     (*A_SpMat)[i][j] = *(a.ParallelAssemble());  
 
                     if(i == j){
-                        (*L_SpMat)[i][j] = *mHPM;
+                        (*L_SpMat)[i][j] = *m_HPM;
                         (*L_SpMat)[i][j].Add(-theta, *(a.ParallelAssemble())); 
                     } else {
                         (*L_SpMat)[i][j] = *(a.ParallelAssemble());

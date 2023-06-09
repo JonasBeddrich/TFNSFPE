@@ -7,7 +7,10 @@
 // #define Experiment5_pres_C
 // #define Experiment6
 
-#define calculate_initial_condition
+#define calculate_psi_from_eta
+
+// #define calculate_initial_velocity_field 
+// #define calculate_initial_condition
 
 /* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
 
@@ -39,14 +42,14 @@ using namespace mfem;
 
 const int dim = 2;
 const int n_modes = 20; 
-const int N=3;
+const int N=10; 
 const int vector_size = N*N;
 const double a = 0.5; // this is the one for the weighted hermite polynomials 
 
 /* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
 
-double dt = 0.001; 
-int plot_frequency = 1; 
+double dt = 0.02; 
+int plot_frequency = 5; 
 
 /* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
 
@@ -85,7 +88,7 @@ void u_IC(const Vector &x, double t, Vector &u){
 #endif 
 
 #if defined(Experiment3)
-const std::string scenario = "Exp3"; 
+const std::string scenario = "testing"; 
 double t_final = 10;
 const int n_refine = 0; 
 bool prescribed_velocity = true; 
@@ -1789,8 +1792,9 @@ void phi_psiM_function(const Vector &x, Vector &y){
         y(2448) = 9.178853423325096e-09;
     }
 
-    for (int i = 1; i < vector_size; i++){
-        y(i) = y(i) * x(0) * x(1); 
-    }
+    // for (int i = 0; i < vector_size; i++){
+    //     y(i) = 1; 
+    // }
+    // y(2) = 2; 
 
 }

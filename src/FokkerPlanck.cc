@@ -41,7 +41,7 @@ int main(int argc, char *argv[]){
     #endif
 
     #if defined(Experiment3)
-        *mesh = Mesh::MakeCartesian2D(2, 2, Element::Type::QUADRILATERAL);
+        *mesh = Mesh::MakeCartesian2D(8, 8, Element::Type::QUADRILATERAL);
     #endif
 
     #if defined(Experiment4)
@@ -83,38 +83,27 @@ int main(int argc, char *argv[]){
     }
     delete mesh;
 
+    ParaViewDataCollection *pd = NULL;
+    pd = new ParaViewDataCollection(scenario
+        + symmetry 
+        + "_" + tf_degree
+        + "_N=" + to_string(N)
+        + "_m=" + to_string(n_modes)
+        + "_dt=" + to_string(dt), pmesh);
+    pd->SetPrefixPath("ParaView");
+    pd->SetLevelsOfDetail(1);
+    pd->SetDataFormat(VTKFormat::BINARY);
+    pd->SetHighOrderOutput(true);
+
     // Define the finite element and the finite element space
     H1_FECollection fec(1, dim);
     ParFiniteElementSpace fespace(pmesh, &fec); // scalar
     ParFiniteElementSpace v2dfespace(pmesh, &fec, 2, Ordering::byNODES); // 2D vector
     ParFiniteElementSpace vfespace(pmesh, &fec, vector_size, Ordering::byNODES); // phi vector
-    const int n_dof = fespace.GetTrueVSize();
-
-    cout << n_dof << endl; 
-
-    Array<int> vess_tdof_list;
-    Array<int> vess_bdr;
-    if (pmesh->bdr_attributes.Size())
-    {
-        vess_bdr.SetSize(pmesh->bdr_attributes.Max());
-        vess_bdr = 1;
-        vfespace.GetEssentialTrueDofs(vess_bdr, vess_tdof_list);
-    }
-
-            
-    ParBilinearForm *n(new ParBilinearForm(&fespace)); 
-    cout << "n " << n->NumCols() << " " << n->NumRows() << " " << fespace.GlobalVSize() << " "
-    << fespace.GlobalTrueVSize() << " " << fespace.GetTrueVSize() << endl; 
-
-    Array<int> ess_tdof_list;
-    Array<int> ess_bdr;
-    if (pmesh->bdr_attributes.Size())
-    {
-        ess_bdr.SetSize(pmesh->bdr_attributes.Max());
-        ess_bdr = 1;
-        fespace.GetEssentialTrueDofs(ess_bdr, ess_tdof_list);
-    }
-
+    
+    const int n_dof = fespace.GetVSize();
+    const int n_true_dof = fespace.GetTrueVSize();
+    
     // Create offset vector for phi vector
     // i.e. indices where the next phi_ij starts
     Array<int> block_offsets(vector_size+1);
@@ -124,39 +113,43 @@ int main(int argc, char *argv[]){
     }
     block_offsets.PartialSum();
     
+    Array<int> true_block_offsets(vector_size+1);
+    true_block_offsets[0]=0;
     for (int i = 1; i < vector_size + 1; i++){
-        cout << i << " " << block_offsets[i] << endl; 
+        true_block_offsets[i] =  n_true_dof;
     }
-
-    // Blockvector for eta and psi 
+    true_block_offsets.PartialSum();
+    
+    // Blockvector for eta, psi, psi0, eta0 is 0 anyway 
     BlockVector phi_eta_block(block_offsets);
     BlockVector phi_psi_block(block_offsets);
+    BlockVector phi_psi0_block(block_offsets);
+
+    BlockVector phi_Fpsi0_block(block_offsets);
     phi_eta_block = 0.;
     phi_psi_block = 0.;
-    
-    // Blockvector for initial conditions, eta0 is 0 anyway 
-    BlockVector phi_psi0_block(block_offsets);
-    BlockVector phi_psiM_block(block_offsets);
     phi_psi0_block = 0; 
-    phi_psiM_block = 0; 
-    
+
+    BlockVector phi_eta_true_block(true_block_offsets); 
+    BlockVector phi_psi_true_block(true_block_offsets); 
+    BlockVector phi_psi0_true_block(true_block_offsets); 
+    phi_eta_true_block = 0; 
+    phi_psi_true_block = 0; 
+    phi_psi0_true_block = 0; 
+
     // Blockvectors for F(phi) and so on ... better than calling everything tmp 
-    BlockVector phi_Fpsi0_block(block_offsets);
-    BlockVector phi_FR_block(block_offsets);
-    BlockVector phi_Fx_block(block_offsets);
-    phi_Fpsi0_block = 0;
-    phi_FR_block = 0.;
-    phi_Fx_block = 0.;
+    BlockVector phi_Fpsi0_true_block(true_block_offsets);
+    BlockVector phi_FR_true_block(true_block_offsets);
+    BlockVector phi_Fx_true_block(true_block_offsets);
+    phi_Fpsi0_true_block = 0;
+    phi_FR_true_block = 0.;
+    phi_Fx_true_block = 0.;
 
-    // Create grid functions 
-    ParGridFunction phi_psi(&vfespace, phi_psi.GetData());
-    ParGridFunction phi_eta(&vfespace, phi_eta.GetData());
+    // Needed to project the initial condition 
     ParGridFunction phi_psi0(&vfespace, phi_psi0_block.GetData());
-    ParGridFunction phi_psiM(&vfespace, phi_psiM_block.GetData());
-
+   
     NavierSolver flowsolver(pmesh, 2, nu);
-
-
+    
     // Velocity initial conditions
     ParGridFunction *u_ic = flowsolver.GetCurrentVelocity();
     VectorFunctionCoefficient u_IC_coeff(pmesh->Dimension(), u_IC);
@@ -164,23 +157,38 @@ int main(int argc, char *argv[]){
     
     // Load initial conditions and fill psiM
     VectorFunctionCoefficient phi_psiM_coeff(vector_size, phi_psiM_function);
-    phi_psiM.ProjectCoefficient(phi_psiM_coeff);
-    phi_psi0_block = phi_psiM_block;  
+    // phi_psiM.ProjectCoefficient(phi_psiM_coeff);
+    phi_psi0.ProjectCoefficient(phi_psiM_coeff);
 
     // Create references to the single phis
+    std::vector<ParGridFunction> phis_psi0(vector_size); 
     std::vector<ParGridFunction> phis_eta(vector_size);
     std::vector<ParGridFunction> phis_psi(vector_size);
+    std::vector<ParGridFunction> phis_Fpsi0(vector_size);
+
     for (int i = 0; i < vector_size; i++ ){
+        phis_psi0[i].MakeRef(&fespace, phi_psi0_block.GetBlock(i),0);
         phis_eta[i].MakeRef(&fespace, phi_eta_block.GetBlock(i),0);
         phis_psi[i].MakeRef(&fespace, phi_psi_block.GetBlock(i),0);
+        phis_Fpsi0[i].MakeRef(&fespace, phi_Fpsi0_block.GetBlock(i),0);
+    }
+
+    for (int i = 0; i < vector_size; i++ ){
+        pd->RegisterField("phi_eta " + std::to_string(i), &phis_eta[i]);
+        pd->RegisterField("phi_psi " + std::to_string(i), &phis_psi[i]);
+        pd->RegisterField("phi_Fpsi_0 " + std::to_string(i), &phis_Fpsi0[i]);
+    }
+
+    for (int i = 0; i < vector_size; i++ ){
+        phis_psi0[i].GetTrueDofs(phi_psi0_true_block.GetBlock(i)); 
     }
 
     // Create vector of blockvectors for modes
-    std::vector<BlockVector> phi_eta_modes(n_modes,BlockVector(block_offsets));
-    std::vector<BlockVector> phi_psi_modes(n_modes,BlockVector(block_offsets));
+    std::vector<BlockVector> phi_eta_true_modes(n_modes,BlockVector(true_block_offsets));
+    std::vector<BlockVector> phi_psi_true_modes(n_modes,BlockVector(true_block_offsets));
     for (int i = 0; i < n_modes; i++){
-        phi_eta_modes[i] = 0.;
-        phi_psi_modes[i] = 0.;
+        phi_eta_true_modes[i] = 0.;
+        phi_psi_true_modes[i] = 0.;
     }
 
     // velocity boundary conditions
@@ -371,9 +379,9 @@ int main(int argc, char *argv[]){
     double tmp = 0.0;
     bool done = false;
 
-    Vector tmp_vector(n_dof);
-    BlockVector tmp_block_vector(block_offsets);
-    BlockVector tmp2_block_vector(block_offsets);
+    Vector tmp_vector(n_true_dof);
+    BlockVector tmp_block_vector(true_block_offsets);
+    BlockVector tmp2_block_vector(true_block_offsets);
 
     // Get velocity and pressure from Navier-Stokes solver 
     ParGridFunction *u_gf_NS = flowsolver.GetCurrentVelocity();
@@ -414,40 +422,31 @@ int main(int argc, char *argv[]){
     GridFunctionCoefficient d2u2_coeff(dyu2_gf); 
 
     // Configuration space solver
-    CSS css(fespace, phi_Fpsi0_block, phi_eta_modes, vector_size, block_offsets, u_gf_NS, chi_coeff, xi_coeff, vess_tdof_list);
+    CSS css(fespace, phi_Fpsi0_true_block, phi_eta_true_modes, vector_size, true_block_offsets, u_gf_NS, chi_coeff, xi_coeff);
 
     // Physical space solver
-    PSS pss(fespace, phi_Fpsi0_block, phi_eta_modes, u_coeff, &t);
+    PSS pss(fespace, phi_Fpsi0_true_block, phi_eta_true_modes, u_coeff, &t);
 
     // Navier Stokes
     flowsolver.Setup(dt);
 
-    ParBilinearForm M(&fespace);
-    M.AddDomainIntegrator(new MassIntegrator);
-    M.Assemble();
-    HypreParMatrix M_mat; 
-    M.FormSystemMatrix(ess_tdof_list, M_mat); 
+    ParBilinearForm m(&fespace);
+    m.AddDomainIntegrator(new MassIntegrator);
+    m.Assemble();
+    m.Finalize(); 
+    HypreParMatrix *m_HPM = m.ParallelAssemble(); 
 
-    BiCGSTABSolver m_solver;
+    BiCGSTABSolver m_solver(MPI_COMM_WORLD);
     m_solver.iterative_mode=false;
     m_solver.SetRelTol(1e-12);
     m_solver.SetMaxIter(1000);
     m_solver.SetPrintLevel(0);
-    m_solver.SetOperator(M_mat);
+    m_solver.SetOperator(*m_HPM);
 
     // ****************************************************************
     // Output
 
     // Prepare paraview output and save initial conditions
-    ParaViewDataCollection *pd = NULL;
-    pd = new ParaViewDataCollection(scenario
-        + symmetry 
-        + "_" + tf_degree
-        + "_N=" + to_string(N)
-        + "_m=" + to_string(n_modes)
-        + "_dt=" + to_string(dt), pmesh);
-    pd->SetPrefixPath("ParaView");
-
     pd->RegisterField("_velocity", u_gf_NS);
     pd->RegisterField("_pressure", p_gf_NS);
 
@@ -464,20 +463,11 @@ int main(int argc, char *argv[]){
     pd->RegisterField("_C12", C12_gf);
     pd->RegisterField("_C22", C22_gf);
 
-    for (int i = 0; i < vector_size; i++ ){
-        pd->RegisterField("phi_eta " + std::to_string(i), &phis_eta[i]);
-        pd->RegisterField("phi_psi " + std::to_string(i), &phis_psi[i]);
-    }
-
-    pd->SetLevelsOfDetail(1);
-    pd->SetDataFormat(VTKFormat::BINARY);
-    pd->SetHighOrderOutput(true);
-
    
     // ****************************************************************
-    // Calculating initial condition 
+    // Calculating initial conditions 
 
-#if defined(calculate_initial_condition)
+#if defined(calculate_initial_velocity_field)
 
     // ****************************************************************
     // Velocity field 
@@ -495,8 +485,19 @@ int main(int argc, char *argv[]){
 
     cout << "Inital Velocity field done" << endl; 
 
+#endif 
+
+#if defined(calculate_initial_condition)
+
     // ****************************************************************
     // Calculating psi0  
+
+    std::ofstream outstream1;
+    // outstream1.open("phi_psi0_2");
+    // outstream1 << phi_psi0.Size() << endl; 
+    // phi_psi0.Print(outstream1);
+    // outstream1.close();
+
 
     cout << "Computing Initial Condition" << endl; 
     
@@ -550,19 +551,20 @@ int main(int argc, char *argv[]){
 
 #endif 
 
-    cout << "Load Initial Condition" << endl; 
-    
-    std::ifstream inputstream;     
-    inputstream.open("Initial_Condition"); 
-    phi_psi0_block.Load(inputstream); 
-    inputstream.close(); 
-    phi_psi_block = phi_psi0_block; 
+    // cout << "Load Initial Condition" << endl; 
+    // std::ifstream inputstream;     
+    // inputstream.open("Initial_Condition"); 
+    // phi_psi0_block.Load(inputstream); 
+    // inputstream.close(); 
+    // phi_psi_block = phi_psi0_block; 
 
-    cout << "Write output: Initial Condition" << endl; 
+    // cout << "Write output: Initial Condition" << endl; 
     
-    pd->SetCycle(0);
-    pd->SetTime(0.0);
-    pd->Save();
+    // pd->SetCycle(cycle);
+    // pd->SetTime(testtime);
+    // pd->Save();
+
+    cout << "start loop" << endl; 
 
     // ****************************************************************
     // Time loop
@@ -572,90 +574,80 @@ int main(int argc, char *argv[]){
     done = false; 
     
     for (int ti = 0; !done; ){
+    // for (int ti = 0; ti < 2;){
         
         cout << "t: " << t << "s / " << t_final << "s - dt: " << dt << endl;
         
         // ****************************************************************
         // Calculate F(psi0) 
-        css.apply_FR(phi_psi0_block, phi_Fpsi0_block); 
+
+        css.apply_FR(phi_psi0_true_block, phi_Fpsi0_true_block); 
+
         for(int i= 0; i < vector_size; i++){
-            pss.apply_Fx(phi_psi0_block.GetBlock(i), tmp_vector);
-            phi_Fpsi0_block.GetBlock(i) += tmp_vector; 
+            pss.apply_Fx(phi_psi0_true_block.GetBlock(i), tmp_vector);
+            phi_Fpsi0_true_block.GetBlock(i).Add(1, tmp_vector); 
         }
-        
-        std::ofstream outstream1;
-        outstream1.open("Fpsi0");
-        outstream1 << phi_Fpsi0_block.Size() << endl; 
-        phi_Fpsi0_block.Print(outstream1);
-        outstream1.close();  
 
         // Transform to M^-1 F(psi0)
         // Design Choice: I always consider the original vector phi and not M*phi 
         // the tmp_block_vector is necessary due to a constant first input element 
-
         for(int i= 0; i < vector_size; i++){
-            m_solver.Mult(phi_Fpsi0_block.GetBlock(i), tmp_block_vector.GetBlock(i));
+            m_solver.Mult(phi_Fpsi0_true_block.GetBlock(i), tmp_block_vector.GetBlock(i));
         }
-        phi_Fpsi0_block = tmp_block_vector; 
+        phi_Fpsi0_true_block = tmp_block_vector; 
 
         // ****************************************************************
+        // ****************************************************************
         // Solve the configuration space problem 
-
+        
         // summation over modes and right-hand side 
         tmp_block_vector = 0; 
         for (int l = 0; l < n_modes; l++){
-            tmp_block_vector += phi_eta_modes[l]; 
+            tmp_block_vector.Add(1., phi_eta_true_modes[l]); 
         }
-        tmp_block_vector.Add(w_inf * std::pow(t + dt, alpha-1), phi_Fpsi0_block); 
-    
-        // solve for eta^n+0.5 
-        css.solve_Id_minus_theta_FR(tmp_block_vector, phi_eta_block); 
+        tmp_block_vector.Add(w_inf * std::pow(t + dt, alpha-1), phi_Fpsi0_true_block); 
 
-        tmp_block_vector = 0; 
+        // solve for eta^n+0.5 
+        css.solve_Id_minus_theta_FR(tmp_block_vector, phi_eta_true_block); 
+        
         // calculate M^-1 FR eta 
-        css.apply_FR(phi_eta_block, tmp_block_vector); 
+        css.apply_FR(phi_eta_true_block, tmp_block_vector); 
         for(int i= 0; i < vector_size; i++){
-            m_solver.Mult(tmp_block_vector.GetBlock(i), phi_FR_block.GetBlock(i));
+            m_solver.Mult(tmp_block_vector.GetBlock(i), phi_FR_true_block.GetBlock(i));
         }
 
         // update modes 
         for (int l = 0; l < n_modes; l++){
-            phi_eta_modes[l].Add(dt * weights[l], phi_FR_block);
+            phi_eta_true_modes[l].Add(dt * weights[l], phi_FR_true_block);
         }
 
+        // ****************************************************************
         // ****************************************************************
         // Solve the physical space problem  
 
         // summation over modes and right-hand side 
         tmp_block_vector = 0; 
         for (int l = 0; l < n_modes; l++){
-            tmp_block_vector.Add(gammas[l], phi_eta_modes[l]); 
+            tmp_block_vector.Add(gammas[l], phi_eta_true_modes[l]); 
         }
-        tmp_block_vector.Add(w_inf * std::pow(t + dt,alpha-1), phi_Fpsi0_block); 
+        tmp_block_vector.Add(w_inf * std::pow(t + dt,alpha-1), phi_Fpsi0_true_block); 
 
         // solve for eta^n+1 and store it 
         for(int i = 0; i < vector_size; i++){
-            pss.solve_Id_minus_beta_Fx(tmp_block_vector.GetBlock(i), phi_eta_block.GetBlock(i)); 
+            pss.solve_Id_minus_beta_Fx(tmp_block_vector.GetBlock(i), phi_eta_true_block.GetBlock(i)); 
         }
 
-        tmp_block_vector = 0; 
         // calculate M^⁻1 Fx eta   
         for(int i = 0; i < vector_size; i++){
-            pss.apply_Fx(phi_eta_block.GetBlock(i), tmp_block_vector.GetBlock(i)); 
-            m_solver.Mult(tmp_block_vector.GetBlock(i), phi_Fx_block.GetBlock(i));
+            pss.apply_Fx(phi_eta_true_block.GetBlock(i), tmp_block_vector.GetBlock(i)); 
+            m_solver.Mult(tmp_block_vector.GetBlock(i), phi_Fx_true_block.GetBlock(i));
         }
-
-        std::ofstream outstream2;
-        outstream2.open("phi_eta_block");
-        outstream2 << phi_eta_block.Size() << endl; 
-        phi_eta_block.Print(outstream2);
-        outstream2.close();  
-
+       
         // update modes 
         for (int l = 0; l < n_modes; l++){
-            phi_eta_modes[l].Add(dt * weights[l], phi_Fx_block);
-            phi_eta_modes[l].Add(dt * weights[l] * std::pow(t + dt, alpha-1), phi_Fpsi0_block);
-            phi_eta_modes[l] *= gammas[l];  
+            phi_eta_true_modes[l].Add(dt * weights[l], phi_Fx_true_block);
+            phi_eta_true_modes[l].Add(dt * weights[l] * std::pow(t + dt, alpha-1), phi_Fpsi0_true_block);
+            phi_eta_true_modes[l] *= gammas[l];  
         }
 
         // TODO: Make this a defined statement 
@@ -665,27 +657,32 @@ int main(int argc, char *argv[]){
             t += dt; 
         }
 
+#if defined(calculate_psi_from_eta)
+
         // ****************************************************************
         // Calculate psi from eta  
 
         // Calculate the psi modes 
         for (int l = 0; l < n_modes; l++){
-            tmp_block_vector = phi_eta_block; 
+            tmp_block_vector = phi_eta_true_block; 
             tmp_block_vector *= dt * weights_psi[l]; 
-            tmp_block_vector += phi_psi_modes[l]; 
+            tmp_block_vector += phi_psi_true_modes[l]; 
             tmp_block_vector *= gammas_psi[l]; 
-            phi_psi_modes[l] = tmp_block_vector; 
+            phi_psi_true_modes[l] = tmp_block_vector; 
         }
 
         // psi inf 
-        phi_psi_block = phi_eta_block; 
-        phi_psi_block *= w_inf_psi; 
+        phi_psi_true_block = phi_eta_true_block; 
+        phi_psi_true_block *= w_inf_psi; 
+
         // psi 0 
-        phi_psi_block += phi_psi0_block; 
+        phi_psi_true_block += phi_psi0_true_block; 
         // psi k 
         for (int l = 0; l < n_modes; l++){
-            phi_psi_block += phi_psi_modes[l]; 
+            phi_psi_true_block += phi_psi_true_modes[l]; 
         }
+
+#endif 
         
         // Check if done 
         done = (t >= t_final - 1e-8 * dt);
@@ -699,6 +696,13 @@ int main(int argc, char *argv[]){
 
         // ****************************************************************
         // Output 
+
+        // Distribute true_dofs to ParGridFunctions 
+        for(int i = 0; i < vector_size; i++){
+            phis_eta[i].Distribute(phi_eta_true_block.GetBlock(i)); 
+            phis_psi[i].Distribute(phi_psi_true_block.GetBlock(i)); 
+            phis_Fpsi0[i].Distribute(phi_Fpsi0_true_block.GetBlock(i)); 
+        }
 
         // Calculate the derivatives of u 
         u_gf_NS->GetDerivative(1,0,*dxu1_gf); 
@@ -726,13 +730,15 @@ int main(int argc, char *argv[]){
             pd->SetCycle(iteration_counter);
             pd->SetTime(t);
             pd->Save();
-        }
+        }        
     }
 
     cout << "t: " << t << "s / " << t_final << "s" << endl;
 
     // Free the used memory.
     delete pd;
+    delete m_HPM; 
+
     auto stop = high_resolution_clock::now();
     auto duration = duration_cast<microseconds>(stop - start);
     cout << "The simulation took " << duration.count()/1000000. << " seconds."<< endl;
