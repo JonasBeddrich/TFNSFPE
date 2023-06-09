@@ -76,7 +76,10 @@ int main(int argc, char *argv[]){
         mesh = new Mesh(mesh_file);
     #endif
 
-    // create parallel mesh 
+    #if defined(Experiment7)
+        mesh = new Mesh(mesh_file);
+    #endif
+
     auto *pmesh = new ParMesh(MPI_COMM_WORLD, *mesh);
     for (int i = 0; i < n_refine; i++){
         pmesh->UniformRefinement();
@@ -303,6 +306,14 @@ int main(int argc, char *argv[]){
     #if defined(Experiment6)
         ProductCoefficient xi_coeff(trace_C_coeff, trace_C_coeff);
         ProductCoefficient chi_coeff(1.0, trace_C_coeff);
+    #endif
+
+    #if defined(Experiment7)
+        ConstantCoefficient one_coeff(1.0);
+        ProductCoefficient xi_coeff(1.0, one_coeff);
+        ProductCoefficient chi_coeff(1.0, one_coeff);
+        // ProductCoefficient xi_coeff(trace_C_coeff, trace_C_coeff);
+        // ProductCoefficient chi_coeff(1.0, trace_C_coeff);
     #endif
 
     // ****************************************************************

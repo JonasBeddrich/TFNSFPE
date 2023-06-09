@@ -6,6 +6,7 @@
 // #define Experiment5_pres_u
 // #define Experiment5_pres_C
 // #define Experiment6
+#define Experiment7
 
 #define calculate_psi_from_eta
 
@@ -32,7 +33,7 @@
 
 /* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
 
-const double alpha = 1.0; 
+const double alpha = 1.; 
 const std::string tf_degree = "alpha=" + std::to_string(alpha); 
 
 /* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
@@ -113,7 +114,7 @@ bool prescribed_velocity = false;
 
 // xi and chi are set depening on psi ... thus not defined here 
 const double nu = 0.59; 
-const double eps = 1.; 
+const double eps = 1.; // this is changed in comparison to the Mizerova and She paper 
 
 // void u_BC(const Vector &x, double t, Vector&u){
 //     if (x(1) > 0.5){ // top boundary 
@@ -243,6 +244,34 @@ void u_IC(const Vector &x, double t, Vector &u){
 }
 
 #endif 
+
+#if defined(Experiment7)
+const std::string scenario = "Exp7"; 
+double t_final = 4;
+const char *mesh_file = "../src/half_channel_ref1.msh";
+const int n_refine = 1; 
+bool prescribed_velocity = false; 
+
+// xi and chi are set depening on psi ... thus not defined here 
+const double nu = 0.59; 
+const double eps = 1.; 
+
+void u_BC(const Vector &x, double t, Vector&u){
+    u(0) = 0; 
+    u(1) = 0; 
+
+    if(x(0) < 1e-8 || x(0) > 3 - 1e-8){
+        u(0) = 0.25 * x(1) * (1-x(1)); 
+    } 
+}
+
+void u_IC(const Vector &x, double t, Vector &u){
+    u(0) = 0; 
+    u(1) = 0; 
+}
+
+#endif 
+
 
 /* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
 // for some tests
