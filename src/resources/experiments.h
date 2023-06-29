@@ -49,53 +49,48 @@ void u_IC(const Vector &x, double t, Vector &u){
 }
 #endif 
 
-#if defined(Experiment4)
-const std::string scenario = "Exp4_no16_testing"; 
-double t_final = 10;
-const char *mesh_file = "../src/test.mesh";
-const int n_refine = 4; 
-bool prescribed_velocity = false;
+// #if defined(Experiment4)
+// const std::string scenario = "Exp4_no16_testing"; 
+// double t_final = 10;
+// const char *mesh_file = "../src/test.mesh";
+// const int n_refine = 4; 
+// bool prescribed_velocity = false;
 
 
-void load_mesh(Mesh* mesh){ 
-    *mesh = Mesh::MakeCartesian2D(2, 2, Element::Type::QUADRILATERAL);
-}
+// void load_mesh(Mesh* mesh){ 
+//     *mesh = Mesh::MakeCartesian2D(2, 2, Element::Type::QUADRILATERAL);
+// }
 
-// xi and chi are set depening on psi ... thus not defined here 
-const double nu = 0.59; 
-const double eps = 1.; // this is changed in comparison to the Mizerova and She paper 
+// // xi and chi are set depening on psi ... thus not defined here 
+// const double nu = 0.59; 
+// const double eps = 1.; // this is changed in comparison to the Mizerova and She paper 
+
+// // void u_BC(const Vector &x, double t, Vector&u){
+// //     if (x(1) > 0.5){ // top boundary 
+// //         u(0) = 16 * x(0) * x(0) * (1-x(0)) * (1-x(0)); 
+// //     } else { // bottom boundary 
+// //         u(0) = 0; 
+// //     }
+// //     u(1) = 0; 
+// // }
 
 // void u_BC(const Vector &x, double t, Vector&u){
-//     if (x(1) > 0.5){ // top boundary 
-//         u(0) = 16 * x(0) * x(0) * (1-x(0)) * (1-x(0)); 
-//     } else { // bottom boundary 
-//         u(0) = 0; 
-//     }
+//     // if (x(1) > 0.999999){ // top boundary 
+//     u(0) = x(0) * x(0) * (1-x(0)) * (1-x(0)); 
+//     u(1) = - x(0) * x(1) * (4 * x(0) * x(0) - 6 * x(0) + 2); 
+//     // } else { // other boundaries 
+//     //     u(0) = 0; 
+//     //     u(1) = 0; 
+//     // }
+// } 
+
+// void u_IC(const Vector &x, double t, Vector &u){
+//     // u(0) = x(0) * x(0) * (1-x(0)) * (1-x(0)); 
+//     // u(1) = - x(0) * x(1) * (4 * x(0) * x(0) - 6 * x(0) + 2); 
+//     u(0) = 0; 
 //     u(1) = 0; 
 // }
-
-void u_BC(const Vector &x, double t, Vector&u){
-    // if (x(1) > 0.999999){ // top boundary 
-    u(0) = x(0) * x(0) * (1-x(0)) * (1-x(0)); 
-    u(1) = - x(0) * x(1) * (4 * x(0) * x(0) - 6 * x(0) + 2); 
-    // } else { // other boundaries 
-    //     u(0) = 0; 
-    //     u(1) = 0; 
-    // }
-} 
-
-// void u_BC(const Vector &x, double t, Vector&u){
-//     u(0) = x(1) * x(1) * x(0); 
-//     u(1) = -x(0) * x(1) * x(0) ; 
-// }
-
-void u_IC(const Vector &x, double t, Vector &u){
-    // u(0) = x(0) * x(0) * (1-x(0)) * (1-x(0)); 
-    // u(1) = - x(0) * x(1) * (4 * x(0) * x(0) - 6 * x(0) + 2); 
-    u(0) = 0; 
-    u(1) = 0; 
-}
-#endif 
+// #endif 
 
 #if defined(Experiment4_Medea)
 const std::string scenario = "Exp4_Medea_100"; 

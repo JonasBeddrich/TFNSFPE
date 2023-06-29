@@ -6,9 +6,11 @@
 #include <algorithm>
 #include <functional>
 
+
 #include <setting.h>
-#include <resources/experiments.h>
+#include <resources/experiment4.h>
 #include <resources/experiment7.h>
+#include <resources/experiments.h>
 #include <resources/initialConditions.h>
 #include <resources/rational_approximation.h>
 #include <operators/finite_difference_scheme.h>
@@ -34,7 +36,8 @@ int main(int argc, char *argv[]){
     Hypre::Init();
 
     Mesh *mesh = new Mesh();
-    mesh = new Mesh(mesh_file);  
+    load_mesh(mesh); 
+    // mesh = new Mesh(mesh_file);  
 
     // // *mesh = Mesh::MakeCartesian2D(4, 4, Element::QUADRILATERAL);
 
@@ -95,7 +98,7 @@ int main(int argc, char *argv[]){
     ParaViewDataCollection *pd = NULL;
     pd = new ParaViewDataCollection(scenario
         + symmetry 
-        + "_" + tf_degree
+        + "_alpha=" + std::to_string(alpha)
         + "_N=" + to_string(N)
         + "_m=" + to_string(n_modes)
         + "_dt=" + to_string(dt), pmesh);
@@ -105,6 +108,7 @@ int main(int argc, char *argv[]){
     pd->SetHighOrderOutput(true);
 
     // Define the finite element and the finite element space
+    const int vector_size = N*N; 
     H1_FECollection fec(1, dim);
     ParFiniteElementSpace fespace(pmesh, &fec); // scalar
     ParFiniteElementSpace v2dfespace(pmesh, &fec, 2, Ordering::byNODES); // 2D vector
@@ -240,14 +244,14 @@ int main(int argc, char *argv[]){
     VectorSumCoefficient T_12(T_1, T_2);
     VectorSumCoefficient T_34(T_3, T_4);
 
-    #if !defined(Experiment5_pres_C)
+    // #if !defined(Experiment5_pres_C)
     double scale_T = 100; 
     VectorCoefficient *T = new VectorSumCoefficient(T_12,T_34,scale_T,scale_T);
-    #endif 
+    // #endif 
 
-    #if defined(Experiment5_pres_C)
-        VectorFunctionCoefficient *T = new VectorFunctionCoefficient(dim, div_T); 
-    #endif
+    // // #if defined(Experiment5_pres_C)
+    // VectorFunctionCoefficient *T = new VectorFunctionCoefficient(dim, div_T); 
+    // // #endif
 
     Array<int> domain_attr(pmesh->attributes.Max());
     domain_attr = 1;
@@ -410,12 +414,6 @@ int main(int argc, char *argv[]){
     GridFunctionCoefficient d1u2_coeff(dxu2_gf); 
     GridFunctionCoefficient d2u2_coeff(dyu2_gf); 
 
-    // Configuration space solver
-    CSS css(fespace, phi_Fpsi0_true_block, phi_eta_true_modes, vector_size, true_block_offsets, u_gf_NS, chi_coeff, xi_coeff);
-
-    // Physical space solver
-    PSS pss(fespace, phi_Fpsi0_true_block, phi_eta_true_modes, u_coeff);
-
     // Navier Stokes
     flowsolver.Setup(dt);
 
@@ -451,7 +449,6 @@ int main(int argc, char *argv[]){
     pd->RegisterField("_C11", C11_gf);
     pd->RegisterField("_C12", C12_gf);
     pd->RegisterField("_C22", C22_gf);
-
     
     // ****************************************************************
     // Calculate initial conditions - velocity field  
@@ -466,7 +463,7 @@ int main(int argc, char *argv[]){
     for (int i = 0; i < n_iter_IC_vel; i++){
         if(verbose){
             cout << endl; 
-            cout << "Iteration: " << i << endl; 
+            cout << "Initial velocity field - Iteration: " << i << endl; 
         }
         double j=0; 
         flowsolver.Step(j, dt_IC_vel, 0);
@@ -476,10 +473,6 @@ int main(int argc, char *argv[]){
         cout << endl; 
         cout << "Recalculate operators for initial velocity field" << endl; 
     }
-    
-    // calculate the operators update the operators for the new velocity field 
-    css.calculate_operators();
-    pss.calculate_operators();
 
 #endif 
     
@@ -496,15 +489,25 @@ int main(int argc, char *argv[]){
         cout << "" << endl; 
     }
     
+    // Operators for the integer-order problem (Id - dt * F)
+    CSS css_IC(fespace, vector_size, true_block_offsets, u_gf_NS, chi_coeff, xi_coeff);
+    PSS pss_IC(fespace, u_coeff);
+
+    css_IC.set_theta(dt_IC); 
+    pss_IC.set_beta(dt_IC); 
+    
     int ti_IC = 0; 
     double t_IC = 0.0; 
     bool done_IC = false; 
 
-    // Set operators to the integer-order problem (Id - dt * F)
-    css.set_theta(dt_IC); 
-    pss.set_beta(dt_IC); 
-    
     for (int ti_IC = 0; !done_IC; ){
+        
+        for(int i = 0; i < vector_size; i++){
+            phis_eta[i].Distribute(phi_eta_true_block.GetBlock(i)); 
+            phis_psi[i].Distribute(phi_psi_true_block.GetBlock(i)); 
+            phis_Fpsi0[i].Distribute(phi_Fpsi0_true_block.GetBlock(i)); 
+        }
+
         if(ti_IC % plot_frequency_IC == 0){
             pd->SetCycle(ti_total);
             pd->SetTime(-(t_final_IC - t_IC));
@@ -515,12 +518,13 @@ int main(int argc, char *argv[]){
             cout << "t: " << t_IC << "s / " << t_final_IC << "s - dt: " << dt_IC << endl;
         }        
 
-        css.solve_Id_minus_theta_FR(phi_psi0_block, tmp_block_vector);                
+        css_IC.solve_Id_minus_theta_FR(phi_psi0_true_block, tmp_block_vector);                
+
         for(int i = 0; i < vector_size; i++){
-            pss.solve_Id_minus_beta_Fx(tmp_block_vector.GetBlock(i), phi_psi0_block.GetBlock(i)); 
+            pss_IC.solve_Id_minus_beta_Fx(tmp_block_vector.GetBlock(i), phi_psi0_true_block.GetBlock(i)); 
         }
-        
-        phi_psi_block = phi_psi0_block; 
+
+        phi_psi_true_block = phi_psi0_true_block; 
 
         t_IC += dt_IC; 
         ti_IC++;
@@ -529,31 +533,22 @@ int main(int argc, char *argv[]){
         done_IC = (t_final_IC <= t_IC + 1e-8 * dt_IC);
     }
 
-    if(verbose){
-        cout << endl; 
-        cout << "Store initial condition for psi, "; 
-    }
+    // if(verbose){
+    //     cout << endl; 
+    //     cout << "Store initial condition for psi, "; 
+    // }
 
-    std::ofstream outstream;
-    outstream.open("Initial_Condition");
-    outstream << phi_psi0_block.Size() << endl; 
-    phi_psi0_block.Print(outstream);
-    outstream.close();  
-
-    if(verbose){
-        cout << "reset operators" << endl; 
-        cout << endl; 
-    }
-    
-    // Reset the CSS to the fractional problem (Id - theta * F)
-    css.reset_theta(); 
-    pss.reset_beta(); 
+    // std::ofstream outstream;
+    // outstream.open("Initial_Condition"+scenario + symmetry + "_N=" + to_string(N));
+    // outstream << phi_psi0_block.Size() << endl; 
+    // phi_psi0_block.Print(outstream);
+    // outstream.close();  
 
 #endif 
 
     // cout << "Load Initial Condition" << endl; 
     // std::ifstream inputstream;     
-    // inputstream.open("Initial_Condition"); 
+    // inputstream.open("Initial_Condition"+scenario + symmetry + "_N=" + to_string(N)); 
     // phi_psi0_block.Load(inputstream); 
     // inputstream.close(); 
     // phi_psi_block = phi_psi0_block; 
@@ -565,7 +560,7 @@ int main(int argc, char *argv[]){
     bool done = false; 
 
     if(verbose){
-        cout << ">>> WRITE INITIAL CONDITIONS <<<" << endl; 
+        cout << ">>> OUTPUT INITIAL CONDITIONS <<<" << endl; 
         cout << "" << endl; 
     }
 
@@ -577,17 +572,30 @@ int main(int argc, char *argv[]){
         cout << ">>> START TIME LOOP <<<" << endl; 
         cout << "" << endl; 
     }
-    
+    std::ofstream outstream;
+
     for (int ti = 0; !done; ){
         
         if(verbose){
             cout << "t: " << t << "s / " << t_final << "s - dt: " << dt << endl;
         }
 
+        CSS css(fespace, vector_size, true_block_offsets, u_gf_NS, chi_coeff, xi_coeff);
+        PSS pss(fespace, u_coeff);
+        
         // ****************************************************************
         // Calculate F(psi0) 
+        outstream.open("phi_psi0_true_block");
+        outstream << phi_psi0_true_block.Size() << endl; 
+        phi_psi0_true_block.Print(outstream);
+        outstream.close();  
 
         css.apply_FR(phi_psi0_true_block, phi_Fpsi0_true_block); 
+
+        outstream.open("phi_Fpsi0_true_block");
+        outstream << phi_Fpsi0_true_block.Size() << endl; 
+        phi_Fpsi0_true_block.Print(outstream);
+        outstream.close();  
 
         for(int i= 0; i < vector_size; i++){
             pss.apply_Fx(phi_psi0_true_block.GetBlock(i), tmp_vector);
@@ -654,8 +662,7 @@ int main(int argc, char *argv[]){
             phi_eta_true_modes[l] *= gammas[l];  
         }
 
-
-        #if defined(prescribed_velocity)
+        #if !defined(prescribed_velocity)
             flowsolver.Step(t, dt, ti);
         #else 
             t += dt; 
@@ -689,14 +696,6 @@ int main(int argc, char *argv[]){
         done = (t >= t_final - 1e-8 * dt);
 
         // ****************************************************************
-        // Prepare operators for next iteration 
-        
-        if(!done){
-            css.calculate_operators();
-            pss.calculate_operators();
-        }
-
-        // ****************************************************************
         // Load output 
 
         for(int i = 0; i < vector_size; i++){
@@ -724,6 +723,9 @@ int main(int argc, char *argv[]){
         C12_gf->ProjectCoefficient(*C12_coeff);
         C22_gf->ProjectCoefficient(*C22_coeff);
 
+        div_u_gf->Distribute(div_u_gf->GetTrueDofs());         
+        T_gf->Distribute(T_gf->GetTrueDofs());         
+
         // Advance iteration counters and write output
         ti++;
         ti_total++; 
@@ -733,22 +735,24 @@ int main(int argc, char *argv[]){
             pd->Save();
         }        
     }
-
-    cout << "t: " << t << "s / " << t_final << "s" << endl;
-
+    
     if(verbose){
+        cout << "t: " << t << "s / " << t_final << "s" << endl;
         cout << "" << endl; 
         cout << ">>> SIMULATION FINISHED <<<" << endl; 
         cout << "" << endl; 
     }
 
     // Free the used memory.
-    delete pd;
-    delete m_HPM; 
+    // delete pd;
+    // delete m_HPM; 
 
     auto stop = high_resolution_clock::now();
     auto duration = duration_cast<microseconds>(stop - start);
-    cout << "The simulation took " << duration.count()/1000000. << " seconds."<< endl;
+    
+    if(verbose){
+        cout << "The simulation took " << duration.count()/1000000. << " seconds."<< endl;
+    }
 
     return 0;
 }

@@ -69,36 +69,31 @@ void fill_coefficient_matrix(std::vector<std::vector<Coefficient*>> &coeff_matri
         int k = i % N; 
 
         // phi z,k 
-        coeff_matrix[i][i] = new SumCoefficient(*A11_coeff, *A22_coeff, (double) - z, (double) - k);  
+        coeff_matrix[i][i] = new SumCoefficient(*A11_coeff, *A22_coeff, (double) - z, (double) - k);
       
         // phi z-1,k-1 
         if(z-1 >= 0 && k-1 >=0){
             coeff_matrix[i][(z-1) * N + k-1] = new SumCoefficient(*A12_coeff, *A21_coeff, - sqrt((double) z * k), - sqrt((double) z * k));  
-            // coeff_matrix[i][(z-1) * N + k-1] = new ConstantCoefficient(0.); 
         }
 
         // phi z-1 k+1 
         if(z-1 >= 0 && k+1 < N){
             coeff_matrix[i][(z-1) * N + k+1] = new ProductCoefficient(- sqrt((double) z * (k+1)), *A12_coeff); 
-            // coeff_matrix[i][(z-1) * N + k+1] = new ConstantCoefficient(0.); 
         }
 
         // phi z+1 k-1 
         if(z+1 < N && k-1 >= 0){
             coeff_matrix[i][(z+1) * N + k-1] = new ProductCoefficient(- sqrt((double) (z+1) * k), *A21_coeff);
-            // coeff_matrix[i][(z+1) * N + k-1] = new ConstantCoefficient(0.); 
         }
       
         // phi z-2 k 
         if(z-2 >= 0){
             coeff_matrix[i][(z - 2) * N + k] = new SumCoefficient(*alpha_alpha_2_chi_coeff, *A11_coeff, sqrt((double) z * (z-1)), - sqrt((double) z * (z-1))); 
-            // coeff_matrix[i][(z - 2) * N + k] = new ConstantCoefficient(0.); 
         }
 
         // phi z   k-2
         if(k-2 >= 0){
             coeff_matrix[i][(z) * N + k - 2] = new SumCoefficient(*alpha_alpha_2_chi_coeff, *A22_coeff, sqrt((double) k * (k-1)), - sqrt((double) k * (k-1)));  
-            // coeff_matrix[i][(z) * N + k - 2] = new ConstantCoefficient(0.); 
         }
     } 
 }

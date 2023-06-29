@@ -24,18 +24,13 @@ private:
     HypreParMatrix* Fx_HPM;  
     HypreParMatrix* M_m_beta_Fx_HPM;  
     
-    BlockVector &phi0; 
-    std::vector<BlockVector> &phi_modes; 
-    
     GMRESSolver pss_solver;
     
     mutable Vector z, tmp; 
 
 public: 
-    PSS(ParFiniteElementSpace &fespace_, BlockVector &phi0_, std::vector<BlockVector> &phi_modes_, VectorGridFunctionCoefficient &u_coeff_):  
+    PSS(ParFiniteElementSpace &fespace_, VectorGridFunctionCoefficient &u_coeff_):  
         fespace(fespace_),                    
-        phi0(phi0_),
-        phi_modes(phi_modes_), 
         z(fespace_.GetVSize()), 
         tmp(fespace_.GetVSize()),
         u_coeff(u_coeff_), 
@@ -43,7 +38,7 @@ public:
         
         // weights for rational approximation 
         beta = get_beta(alpha, dt); 
-        gammas = get_gammas(alpha, dt); 
+        // gammas = get_gammas(alpha, dt); 
         
         // mass matrix 
         m = new ParBilinearForm(&fespace);
@@ -55,7 +50,6 @@ public:
         // coefficients for the physical space operator 
         // eps_coeff = new ConstantCoefficient(eps); 
         eps_coeff = new ConstantCoefficient(-1.0 * eps); 
-        m_1o_beta_coeff = new ConstantCoefficient(-1.0 / beta); 
         
         calculate_operators(); 
     }
@@ -103,6 +97,7 @@ public:
     }
 
     void calculate_operators(){
+        m_1o_beta_coeff = new ConstantCoefficient(-1.0 / beta); 
         // physical space operator        
         Fx = new ParBilinearForm(&fespace); 
         Fx->AddDomainIntegrator(new DiffusionIntegrator(*eps_coeff)); 
