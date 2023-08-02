@@ -32,22 +32,22 @@ void u_IC(const Vector &x, double t, Vector &u){
 }
 #endif 
 
-#if defined(Experiment3)
-const std::string scenario = "testing"; 
-double t_final = 10;
-const int n_refine = 0; 
-bool prescribed_velocity = true; 
+// #if defined(Experiment3)
+// const std::string scenario = "testing"; 
+// double t_final = 10;
+// const int n_refine = 0; 
+// bool prescribed_velocity = true; 
 
-// xi and chi are set depening on psi ... thus not defined here 
-const double eps = 0.01; 
-const double nu = 0.; 
+// // xi and chi are set depening on psi ... thus not defined here 
+// const double eps = 0.01; 
+// const double nu = 0.; 
 
-void u_BC(const Vector &x, double t, Vector &u){}; 
-void u_IC(const Vector &x, double t, Vector &u){
-    u(0) = 0.5 * x(0); 
-    u(1) = - 0.5 * x(1);
-}
-#endif 
+// void u_BC(const Vector &x, double t, Vector &u){}; 
+// void u_IC(const Vector &x, double t, Vector &u){
+//     u(0) = 0.5 * x(0); 
+//     u(1) = - 0.5 * x(1);
+// }
+// #endif 
 
 // #if defined(Experiment4)
 // const std::string scenario = "Exp4_no16_testing"; 
@@ -188,3 +188,56 @@ void u_IC(const Vector &x, double t, Vector &u){
 }
 
 #endif 
+
+
+// mesh = new Mesh(mesh_file);  
+
+    // // *mesh = Mesh::MakeCartesian2D(4, 4, Element::QUADRILATERAL);
+
+    // #if defined(Experiment1)
+    //     *mesh = Mesh::MakeCartesian2D(8, 8, Element::Type::QUADRILATERAL);
+    // #endif
+
+    // #if defined(Experiment2)
+    //     *mesh = Mesh::MakeCartesian2D(8, 8, Element::Type::QUADRILATERAL);
+    // #endif
+
+    // #if defined(Experiment3)
+    //     *mesh = Mesh::MakeCartesian2D(8, 8, Element::Type::QUADRILATERAL);
+    // #endif
+
+    // // #if defined(Experiment4)
+    // //     *mesh = Mesh::MakeCartesian2D(2, 2, Element::Type::QUADRILATERAL);
+    // // #endif
+
+    // #if defined(Experiment4_Medea)
+    //     *mesh = Mesh::MakeCartesian2D(2, 2, Element::Type::QUADRILATERAL);
+    // #endif
+
+    // #if defined(Experiment5_pres_u)
+    //     Mesh square = Mesh::MakeCartesian2D(10, 10, Element::QUADRILATERAL);
+    //     square.Save("Exp5_non_periodic.mesh");
+    //     Vector left_right_translation({1.0, 0.0});
+    //     std::vector<Vector> translations = {left_right_translation};
+    //     *mesh = Mesh::MakePeriodic(square, square.CreatePeriodicVertexMapping(translations));
+    //     mesh->RemoveInternalBoundaries();
+    //     mesh->Save("Exp5_periodic.mesh");
+    // #endif
+
+    // #if defined(Experiment5_pres_C)
+    //     Mesh square = Mesh::MakeCartesian2D(10, 10, Element::QUADRILATERAL);
+    //     square.Save("Exp5_non_periodic.mesh");
+    //     Vector left_right_translation({1.0, 0.0});
+    //     std::vector<Vector> translations = {left_right_translation};
+    //     *mesh = Mesh::MakePeriodic(square, square.CreatePeriodicVertexMapping(translations));
+    //     mesh->RemoveInternalBoundaries();
+    //     mesh->Save("Exp5_periodic.mesh");
+    // #endif
+
+    // #if defined(Experiment6)
+    //     mesh = new Mesh(mesh_file);
+    // #endif
+
+    // #if defined(Experiment7)
+    //     mesh = new Mesh(mesh_file);
+    // #endif

@@ -11,15 +11,42 @@ private:
     double beta; 
     std::vector<double> gammas; 
 
+    double h; 
+    double (coth_ptr)(double); 
+
+    MatrixCoefficient* uuT_coeff; 
+    Coefficient* uTu_coeff; 
+
+    ScalarVectorProductCoefficient* tau_u_coeff; 
+    ScalarMatrixProductCoefficient* tau_uuT_coeff; 
+    ScalarMatrixProductCoefficient* beta_tau_uuT_coeff; 
+
+    ConstantCoefficient* h_coeff; 
+    ConstantCoefficient* h_o_2_coeff; 
+    ConstantCoefficient* h_by_2eps_coeff; 
+
+    ProductCoefficient* Pe1; 
+    ProductCoefficient* Pe2; 
+
+    ProductCoefficient* beta_eps_coeff; 
     ConstantCoefficient* eps_coeff; 
     ConstantCoefficient* m_1o_beta_coeff; 
     VectorGridFunctionCoefficient &u_coeff; 
+
+    ConstantCoefficient* two_coeff; 
 
     ParFiniteElementSpace &fespace; 
     ParBilinearForm* m; 
     ParBilinearForm* Fx;
     ParBilinearForm* M_m_beta_Fx;
     
+
+    ParBilinearForm* RHS;
+    HypreParMatrix* RHS_HPM; 
+
+    ParBilinearForm* Stab_LHS; 
+    HypreParMatrix* Stab_LHS_HPM; 
+
     HypreParMatrix* m_HPM;  
     HypreParMatrix* Fx_HPM;  
     HypreParMatrix* M_m_beta_Fx_HPM;  
@@ -29,15 +56,16 @@ private:
     mutable Vector z, tmp; 
 
 public: 
-    PSS(ParFiniteElementSpace &fespace_, VectorGridFunctionCoefficient &u_coeff_):  
+    PSS(ParFiniteElementSpace &fespace_, VectorGridFunctionCoefficient &u_coeff_, double beta_):  
         fespace(fespace_),                    
         z(fespace_.GetVSize()), 
         tmp(fespace_.GetVSize()),
         u_coeff(u_coeff_), 
+        beta(beta_), 
         pss_solver(MPI_COMM_WORLD){
         
         // weights for rational approximation 
-        beta = get_beta(alpha, dt); 
+        // beta = get_beta(alpha, dt); 
         // gammas = get_gammas(alpha, dt); 
         
         // mass matrix 
@@ -51,6 +79,55 @@ public:
         // eps_coeff = new ConstantCoefficient(eps); 
         eps_coeff = new ConstantCoefficient(-1.0 * eps); 
         
+        // TODO 
+        h = 0.25; 
+        h_coeff = new ConstantCoefficient(h); 
+        h_o_2_coeff = new ConstantCoefficient(h/2); 
+        h_by_2eps_coeff = new ConstantCoefficient(h/(2*eps)); 
+
+        uuT_coeff = new OuterProductCoefficient(u_coeff, u_coeff);
+        uTu_coeff = new InnerProductCoefficient(u_coeff, u_coeff); 
+        
+        Vector e1(2); 
+        Vector e2(2);
+        e1[0] = 1; 
+        e2[1] = 1; 
+        VectorConstantCoefficient e1_coeff(e1); 
+        VectorConstantCoefficient e2_coeff(e2);  
+        
+        InnerProductCoefficient u1_coeff(u_coeff, e1_coeff); 
+        InnerProductCoefficient u2_coeff(u_coeff, e2_coeff);
+
+        Pe1 = new ProductCoefficient(u1_coeff, *h_by_2eps_coeff); 
+        Pe2 = new ProductCoefficient(u1_coeff, *h_by_2eps_coeff); 
+        
+        TransformedCoefficient coth_Pe1(Pe1, &coth); 
+        TransformedCoefficient coth_Pe2(Pe2, &coth); 
+
+        RatioCoefficient m1_o_Pe1(-1., *Pe1); 
+        RatioCoefficient m1_o_Pe2(-1., *Pe2); 
+
+        SumCoefficient f_Pe1_coeff(coth_Pe1, m1_o_Pe1); 
+        SumCoefficient f_Pe2_coeff(coth_Pe2, m1_o_Pe2);
+
+        ProductCoefficient f_Pe1_u1_coeff(f_Pe1_coeff, u1_coeff); 
+        ProductCoefficient f_Pe2_u2_coeff(f_Pe2_coeff, u2_coeff); 
+
+        ProductCoefficient h_o_2_f_Pe1_u1_coeff(f_Pe1_u1_coeff, *h_o_2_coeff); 
+        ProductCoefficient h_o_2_f_Pe2_u2_coeff(f_Pe2_u2_coeff, *h_o_2_coeff); 
+
+        SumCoefficient v_bar_coeff(h_o_2_f_Pe1_u1_coeff, h_o_2_f_Pe2_u2_coeff);
+        RatioCoefficient tau_coeff(v_bar_coeff, *uTu_coeff); 
+
+        tau_u_coeff = new ScalarVectorProductCoefficient(tau_coeff, u_coeff); 
+
+        tau_uuT_coeff = new ScalarMatrixProductCoefficient(tau_coeff, *uuT_coeff); 
+        beta_tau_uuT_coeff = new ScalarMatrixProductCoefficient(beta, *tau_uuT_coeff); 
+
+        beta_eps_coeff = new ProductCoefficient(beta, *eps_coeff); 
+
+        two_coeff = new ConstantCoefficient(2.); 
+
         calculate_operators(); 
     }
 
@@ -65,7 +142,8 @@ public:
         // calculates x = (Id - beta Fx)^-1 M*y 
         
         // z = M*y 
-        m_HPM->Mult(y,z); 
+        // m_HPM->Mult(y,z); 
+        RHS_HPM->Mult(y,z); 
         
         // x = (Id - beta Fx)^-1 z  
         pss_solver.Mult(z, x); 
@@ -97,8 +175,6 @@ public:
     }
 
     void calculate_operators(){
-        m_1o_beta_coeff = new ConstantCoefficient(-1.0 / beta); 
-        // physical space operator        
         Fx = new ParBilinearForm(&fespace); 
         Fx->AddDomainIntegrator(new DiffusionIntegrator(*eps_coeff)); 
         Fx->AddDomainIntegrator(new ConvectionIntegrator(u_coeff)); 
@@ -106,21 +182,48 @@ public:
         Fx->Finalize(); 
         Fx_HPM = Fx->ParallelAssemble(); 
 
-        M_m_beta_Fx = new ParBilinearForm(&fespace); 
-        M_m_beta_Fx->AddDomainIntegrator(new DiffusionIntegrator(*eps_coeff)); 
-        M_m_beta_Fx->AddDomainIntegrator(new ConvectionIntegrator(u_coeff)); 
-        M_m_beta_Fx->AddDomainIntegrator(new MassIntegrator(*m_1o_beta_coeff)); 
-        M_m_beta_Fx->Assemble();
-        M_m_beta_Fx->Finalize(); 
-        M_m_beta_Fx_HPM = M_m_beta_Fx->ParallelAssemble(); 
-        (*M_m_beta_Fx_HPM) *= (-1.0 * beta); 
+        RHS = new ParBilinearForm(&fespace); 
+        RHS->AddDomainIntegrator(new ConservativeConvectionIntegrator(*tau_u_coeff, -1));  //TODO check that the -1 is correct here 
+        RHS->AddDomainIntegrator(new MassIntegrator()); 
+        RHS->Assemble();
+        RHS->Finalize(); 
+        RHS_HPM = RHS->ParallelAssemble(); 
+
+        Stab_LHS = new ParBilinearForm(&fespace); 
+        Stab_LHS->AddDomainIntegrator(new ConservativeConvectionIntegrator(*tau_u_coeff, -1. )); 
+        Stab_LHS->AddDomainIntegrator(new DiffusionIntegrator(*beta_tau_uuT_coeff)); 
+        Stab_LHS->AddDomainIntegrator(new MassIntegrator()); 
+        Stab_LHS->AddDomainIntegrator(new ConvectionIntegrator(u_coeff, beta)); 
+        Stab_LHS->AddDomainIntegrator(new DiffusionIntegrator()); 
+        Stab_LHS->Assemble();
+        Stab_LHS->Finalize(); 
+        Stab_LHS_HPM = Stab_LHS->ParallelAssemble(); 
 
         // set up solver 
         pss_solver.iterative_mode = false;
         pss_solver.SetRelTol(1e-12);
         pss_solver.SetMaxIter(1000);
         pss_solver.SetPrintLevel(0);
-        pss_solver.SetOperator(*M_m_beta_Fx_HPM); 
+        pss_solver.SetOperator(*Stab_LHS_HPM); 
+        
+
+
+        // m_1o_beta_coeff = new ConstantCoefficient(-1.0 / beta); 
+        // M_m_beta_Fx = new ParBilinearForm(&fespace); 
+        // M_m_beta_Fx->AddDomainIntegrator(new DiffusionIntegrator(*eps_coeff)); 
+        // M_m_beta_Fx->AddDomainIntegrator(new ConvectionIntegrator(u_coeff)); 
+        // M_m_beta_Fx->AddDomainIntegrator(new MassIntegrator(*m_1o_beta_coeff)); 
+        // M_m_beta_Fx->Assemble();
+        // M_m_beta_Fx->Finalize(); 
+        // M_m_beta_Fx_HPM = M_m_beta_Fx->ParallelAssemble(); 
+        // (*M_m_beta_Fx_HPM) *= (-1.0 * beta); 
+
+        // // set up solver 
+        // pss_solver.iterative_mode = false;
+        // pss_solver.SetRelTol(1e-12);
+        // pss_solver.SetMaxIter(1000);
+        // pss_solver.SetPrintLevel(0);
+        // pss_solver.SetOperator(*M_m_beta_Fx_HPM); 
     }
 
     void set_beta(double beta_){
@@ -133,5 +236,13 @@ public:
         calculate_operators(); 
     }
 
-    ~PSS(){}
+    ~PSS(){
+        delete m; 
+        delete m_HPM; 
+        delete eps_coeff; 
+        delete Fx; 
+        delete M_m_beta_Fx; 
+        delete Fx_HPM; 
+        delete M_m_beta_Fx_HPM; 
+    }
 }; 

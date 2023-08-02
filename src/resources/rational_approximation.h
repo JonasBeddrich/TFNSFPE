@@ -605,7 +605,25 @@ std::vector<double> get_gammas(double alpha, double dt){
     return gammas; 
 } 
 
+std::vector<double> get_gammas_PSI(double alpha, double dt){
+    std::vector<double> gammas(get_lambdas(alpha)); 
+    std::transform(gammas.begin(), gammas.end(), gammas.begin(),std::bind(std::multiplies<double>(), std::placeholders::_1, 0.5 * dt));
+    std::transform(gammas.begin(), gammas.end(), gammas.begin(),std::bind(std::plus<double>(), std::placeholders::_1, 1));
+    std::transform(gammas.begin(), gammas.end(), gammas.begin(),std::bind(std::divides<double>(), 1, std::placeholders::_1));
+    return gammas; 
+} 
+
 double get_beta(double alpha, double dt){
+    double beta = 0; 
+    std::vector<double> gammas = get_gammas(alpha, dt); 
+    std::vector<double> weights = get_weights(alpha); 
+    std::transform(gammas.begin(), gammas.end(), gammas.begin(),std::bind(std::multiplies<double>(), std::placeholders::_1, dt));
+    std::transform(gammas.begin(), gammas.end(), weights.begin(), gammas.begin(), std::multiplies<double>()); 
+    std::for_each(gammas.begin(), gammas.end(), [&] (double d) {beta += d;}); 
+    return beta + get_w_infinity(alpha); 
+}
+
+double get_beta_PSI(double alpha, double dt){
     double beta = 0; 
     std::vector<double> gammas = get_gammas(alpha, dt); 
     std::vector<double> weights = get_weights(alpha); 
@@ -621,6 +639,8 @@ double get_theta(double alpha, double dt){
     std::for_each(weights.begin(), weights.end(), [&] (double d) {theta += d;}); 
     return theta * dt + get_w_infinity(alpha); 
 }
+
+
 
 // double get_delta(double alpha, double dt){
 //     double delta = 0; 
