@@ -2,7 +2,7 @@ using namespace std;
 using namespace mfem;
 
 #if defined(Experiment7)
-const std::string scenario = "Exp7_convergence_study"; 
+const std::string scenario = "testing"; 
 
 const double alpha = 0.5; 
 const int n_modes = 20;             // rational approximation 
@@ -11,8 +11,8 @@ const double a = 0.5;               // weighted hermite polynomials
 
 // MESH 
 const int dim = 2; 
-const int n_refine = 1; // ACHTUNG NUR DER 5 REF SCHRITT HAT HIER EINE 1 !!! 
-const char *mesh_file = "../src/resources/meshes/half_channel_ref4.msh";
+const int n_refine = 0; // ACHTUNG NUR DER 5 REF SCHRITT HAT HIER EINE 1 !!! 
+const char *mesh_file = "../src/resources/meshes/half_channel_ref1.msh";
 
 // MESH 
 void load_mesh(Mesh* mesh_){ 

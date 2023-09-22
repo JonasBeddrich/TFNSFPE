@@ -48,6 +48,7 @@ int main(int argc, char *argv[]){
     }
     delete mesh;
 
+    // Prepare for Paraview output 
     ParaViewDataCollection *pd = NULL;
     pd = new ParaViewDataCollection("PSI_" 
         + scenario
@@ -80,6 +81,7 @@ int main(int argc, char *argv[]){
     }
     block_offsets.PartialSum();
     
+    // Create true offset vector for phi vector
     Array<int> true_block_offsets(vector_size+1);
     true_block_offsets[0]=0;
     for (int i = 1; i < vector_size + 1; i++){
@@ -87,34 +89,23 @@ int main(int argc, char *argv[]){
     }
     true_block_offsets.PartialSum();
     
-    // Blockvector for eta, psi, psi0, eta0 is 0 anyway 
-    BlockVector phi_eta_block(block_offsets);
+    // Blockvector  
     BlockVector phi_psi_block(block_offsets);
     BlockVector phi_psi0_block(block_offsets);
     BlockVector phi_dt_I_alpha_psi_block(block_offsets); 
-    BlockVector phi_Fpsi0_block(block_offsets);
 
-    phi_eta_block = 0.;
     phi_psi_block = 0.;
     phi_psi0_block = 0; 
     phi_dt_I_alpha_psi_block = 0.; 
 
-    BlockVector phi_eta_true_block(true_block_offsets); 
+    // true block vector for parallelization 
     BlockVector phi_psi_true_block(true_block_offsets); 
     BlockVector phi_psi0_true_block(true_block_offsets); 
     BlockVector phi_dt_I_alpha_psi_true_block(block_offsets); 
-    phi_eta_true_block = 0; 
+
     phi_psi_true_block = 0; 
     phi_psi0_true_block = 0; 
     phi_dt_I_alpha_psi_true_block = 0; 
-
-    // Blockvectors for F(phi) and so on ... better than calling everything tmp 
-    BlockVector phi_Fpsi0_true_block(true_block_offsets);
-    BlockVector phi_FR_true_block(true_block_offsets);
-    BlockVector phi_Fx_true_block(true_block_offsets);
-    phi_Fpsi0_true_block = 0;
-    phi_FR_true_block = 0.;
-    phi_Fx_true_block = 0.;
 
     // Needed to project the initial condition 
     ParGridFunction phi_psi0(&vfespace, phi_psi0_block.GetData());
@@ -129,30 +120,23 @@ int main(int argc, char *argv[]){
     
     // Load initial conditions and fill psiM
     VectorFunctionCoefficient phi_psiM_coeff(vector_size, phi_psiM_function);
-    // phi_psiM.ProjectCoefficient(phi_psiM_coeff);
     phi_psi0.ProjectCoefficient(phi_psiM_coeff);
     phi_psi.ProjectCoefficient(phi_psiM_coeff);
 
     // Create references to the single phis
     std::vector<ParGridFunction> phis_psi0(vector_size); 
-    std::vector<ParGridFunction> phis_eta(vector_size);
     std::vector<ParGridFunction> phis_psi(vector_size);
-    std::vector<ParGridFunction> phis_Fpsi0(vector_size);
     std::vector<ParGridFunction> phis_dt_I_alpha_psi(vector_size); 
 
     for (int i = 0; i < vector_size; i++ ){
         phis_psi0[i].MakeRef(&fespace, phi_psi0_block.GetBlock(i),0);
-        phis_eta[i].MakeRef(&fespace, phi_eta_block.GetBlock(i),0);
         phis_psi[i].MakeRef(&fespace, phi_psi_block.GetBlock(i),0);
-        phis_Fpsi0[i].MakeRef(&fespace, phi_Fpsi0_block.GetBlock(i),0);
         phis_dt_I_alpha_psi[i].MakeRef(&fespace, phi_dt_I_alpha_psi_block.GetBlock(i),0);
     }
 
     for (int i = 0; i < vector_size; i++ ){
-        // pd->RegisterField("phi_eta " + std::to_string(i), &phis_eta[i]);
         pd->RegisterField("phi_psi " + std::to_string(i), &phis_psi[i]);
         pd->RegisterField("phi_dt_I_alpha_psi " + std::to_string(i), &phis_dt_I_alpha_psi[i]);
-        // pd->RegisterField("phi_Fpsi_0 " + std::to_string(i), &phis_Fpsi0[i]);f
     }
 
     for (int i = 0; i < vector_size; i++ ){
@@ -160,10 +144,8 @@ int main(int argc, char *argv[]){
     }
 
     // Create vector of blockvectors for modes
-    std::vector<BlockVector> phi_eta_true_modes(n_modes,BlockVector(true_block_offsets));
     std::vector<BlockVector> phi_psi_true_modes(n_modes,BlockVector(true_block_offsets));
     for (int i = 0; i < n_modes; i++){
-        phi_eta_true_modes[i] = 0.;
         phi_psi_true_modes[i] = 0.;
     }
 
@@ -177,7 +159,8 @@ int main(int argc, char *argv[]){
     flowsolver.AddVelDirichletBC(u_BC, attr);
 #endif
 
-    // Calculating T
+
+    // Calculating div_x T 
     ParGridFunction *phi00 = &phis_dt_I_alpha_psi[0];
     ParGridFunction *phi02 = &phis_dt_I_alpha_psi[2];
     ParGridFunction *phi11 = &phis_dt_I_alpha_psi[1+N];
@@ -212,151 +195,55 @@ int main(int argc, char *argv[]){
     VectorSumCoefficient T_12(T_1, T_2);
     VectorSumCoefficient T_34(T_3, T_4);
 
-    // #if !defined(Experiment5_pres_C)
     VectorCoefficient *T = new VectorSumCoefficient(T_12,T_34,scale_T,scale_T);
-    // #endif 
-
-    // // #if defined(Experiment5_pres_C)
-    // VectorFunctionCoefficient *T = new VectorFunctionCoefficient(dim, div_T); 
-    // // #endif
 
     Array<int> domain_attr(pmesh->attributes.Max());
     domain_attr = 1;
     flowsolver.AddAccelTerm(T, domain_attr);
 
-    // Calculating chi and xi coefficients
     GridFunctionCoefficient phi00_coeff(phi00);
     GridFunctionCoefficient phi02_coeff(phi02);
     GridFunctionCoefficient phi11_coeff(phi11);
     GridFunctionCoefficient phi20_coeff(phi20);
 
-    SumCoefficient phi02n20_coeff(phi02_coeff, phi20_coeff);
-    SumCoefficient trace_C_coeff(phi02n20_coeff, phi00_coeff, 35.54306350526693, 2 * 25.132741228718345);
-
     // ****************************************************************
     // Set parameters xi and chi 
 
-    #if defined(Experiment1)
-        ConstantCoefficient one_coeff(1.0);
-        ProductCoefficient xi_coeff(1.0, one_coeff);
-        ProductCoefficient chi_coeff(1.0, one_coeff);
-    #endif
-
-    #if defined(Experiment2)
-        ConstantCoefficient one_coeff(1.0);
-        ProductCoefficient xi_coeff(1.0, one_coeff);
-        ProductCoefficient chi_coeff(1.0, one_coeff);
-    #endif
-
-    #if defined(Experiment3)
-        ConstantCoefficient one_coeff(1.0);
-        ProductCoefficient xi_coeff(1.0, one_coeff);
-        ProductCoefficient chi_coeff(1.0, one_coeff);
-    #endif
-
-    #if defined(Experiment4)
-        ConstantCoefficient one_coeff(1.0);
-        ProductCoefficient xi_coeff(1.0, one_coeff);
-        ProductCoefficient chi_coeff(1.0, one_coeff);
-    #endif
-
-     #if defined(Experiment4_Medea)
-        ConstantCoefficient one_coeff(1.0);
-        ProductCoefficient xi_coeff(1.0, one_coeff);
-        ProductCoefficient chi_coeff(1.0, one_coeff);
-    #endif
-
-    #if defined(Experiment5_pres_u)
-        ConstantCoefficient one_coeff(1.0);
-        ProductCoefficient xi_coeff(1.0, one_coeff);
-        ProductCoefficient chi_coeff(1.0, one_coeff);
-    #endif
-
-    #if defined(Experiment5_pres_C)
-        ConstantCoefficient one_coeff(1.0);
-        ProductCoefficient xi_coeff(1.0, one_coeff);
-        ProductCoefficient chi_coeff(1.0, one_coeff);
-    #endif
-
-    #if defined(Experiment6)
-        ProductCoefficient xi_coeff(trace_C_coeff, trace_C_coeff);
-        ProductCoefficient chi_coeff(1.0, trace_C_coeff);
-    #endif
-
-    #if defined(Experiment7)
-        ConstantCoefficient one_coeff(1.0);
-        ProductCoefficient xi_coeff(1.0, one_coeff);
-        ProductCoefficient chi_coeff(1.0, one_coeff);
-        // ProductCoefficient xi_coeff(trace_C_coeff, trace_C_coeff);
-        // ProductCoefficient chi_coeff(1.0, trace_C_coeff);
-    #endif
-
-    #if defined(Experiment8)
-        ConstantCoefficient one_coeff(1.0);
-        ProductCoefficient xi_coeff(1.0, one_coeff);
-        ProductCoefficient chi_coeff(1.0, one_coeff);
-        // ProductCoefficient xi_coeff(trace_C_coeff, trace_C_coeff);
-        // ProductCoefficient chi_coeff(1.0, trace_C_coeff);
-    #endif
-
-    // ****************************************************************
-    // Stuff for the output
-
-    ParGridFunction *chi_gf = new ParGridFunction(&fespace);
-    chi_gf->ProjectCoefficient(chi_coeff);
-
-    ParGridFunction *xi_gf = new ParGridFunction(&fespace);
-    xi_gf->ProjectCoefficient(xi_coeff);
-
-    ParGridFunction *T_gf = new ParGridFunction(&v2dfespace);
-    T_gf->ProjectCoefficient(*T);
-
-    ParGridFunction *C11_gf = new ParGridFunction(&fespace);
-    SumCoefficient *C11_coeff = new SumCoefficient(phi00_coeff, phi20_coeff, 25.132741228718345, 35.54306350526693);
-    C11_gf->ProjectCoefficient(*C11_coeff);
-
-    ParGridFunction *C12_gf = new ParGridFunction(&fespace);
-    ProductCoefficient *C12_coeff = new ProductCoefficient(25.132741228718345, phi11_coeff);
-    C12_gf->ProjectCoefficient(*C12_coeff);
-
-    ParGridFunction *C22_gf = new ParGridFunction(&fespace);
-    SumCoefficient *C22_coeff = new SumCoefficient(phi00_coeff, phi02_coeff, 25.132741228718345, 35.54306350526693);
-    C22_gf->ProjectCoefficient(*C22_coeff);
+    ConstantCoefficient one_coeff(1.0);
+    ProductCoefficient xi_coeff(1.0, one_coeff);
+    ProductCoefficient chi_coeff(1.0, one_coeff);
 
     // ****************************************************************
     // Rational Approximation for the TFNSFP system  
+    // the values are precomputed in python 
 
     std::vector<double> lambdas = get_lambdas(alpha);
     std::vector<double> weights = get_weights(alpha);
+    std::vector<double> gammas = get_gammas(alpha, dt);
     double w_inf = get_w_infinity(alpha);
 
-    // ORIGINAL VERSION 
-    // std::vector<double> gammas = get_gammas_PSI(alpha, dt);
-    // TEST VERSION 
-    std::vector<double> gammas = get_gammas(alpha, dt);
-
-    // double beta = get_beta(alpha, dt);
-   
-    cout << "gammas" <<endl; 
+    cout << "gammas" << endl; 
     for(auto i: gammas){
         cout << i << " "; 
     }
     cout << endl; 
 
+    cout << "weights" << endl; 
     for(auto i: weights){
         cout << i << " "; 
     }
     cout << endl; 
 
+    cout << "lambdas" << endl; 
     for(auto i: lambdas){
         cout << i << " "; 
     }
     cout << endl; 
 
-    cout << w_inf << endl; 
+    cout << "w_inf: " << w_inf << endl; 
 
     // ****************************************************************
-    // Setup of the simulation
+    // Prepare for simulation
 
     Vector tmp_vector(n_true_dof);
     BlockVector tmp_block_vector(true_block_offsets);
@@ -380,7 +267,7 @@ int main(int argc, char *argv[]){
     #endif 
 
     // ****************************************************************
-    // Visualization of the gradient of u 
+    // Derivatives of u  
     const FiniteElementCollection *u_fec = u_gf_NS->ParFESpace()->FEColl(); 
     ParFiniteElementSpace u_fes(pmesh, u_fec, 1); 
 
@@ -402,6 +289,7 @@ int main(int argc, char *argv[]){
     // Navier Stokes
     flowsolver.Setup(dt_IC_vel);
 
+    // For the transformation to the coefficient space
     ParBilinearForm m(&fespace);
     m.AddDomainIntegrator(new MassIntegrator);
     m.Assemble();
@@ -417,6 +305,27 @@ int main(int argc, char *argv[]){
 
     // ****************************************************************
     // Output
+
+    ParGridFunction *chi_gf = new ParGridFunction(&fespace);
+    chi_gf->ProjectCoefficient(chi_coeff);
+
+    ParGridFunction *xi_gf = new ParGridFunction(&fespace);
+    xi_gf->ProjectCoefficient(xi_coeff);
+
+    ParGridFunction *T_gf = new ParGridFunction(&v2dfespace);
+    T_gf->ProjectCoefficient(*T);
+
+    ParGridFunction *C11_gf = new ParGridFunction(&fespace);
+    SumCoefficient *C11_coeff = new SumCoefficient(phi00_coeff, phi20_coeff, 25.132741228718345, 35.54306350526693);
+    C11_gf->ProjectCoefficient(*C11_coeff);
+
+    ParGridFunction *C12_gf = new ParGridFunction(&fespace);
+    ProductCoefficient *C12_coeff = new ProductCoefficient(25.132741228718345, phi11_coeff);
+    C12_gf->ProjectCoefficient(*C12_coeff);
+
+    ParGridFunction *C22_gf = new ParGridFunction(&fespace);
+    SumCoefficient *C22_coeff = new SumCoefficient(phi00_coeff, phi02_coeff, 25.132741228718345, 35.54306350526693);
+    C22_gf->ProjectCoefficient(*C22_coeff);
 
     // Prepare paraview output and save initial conditions
     pd->RegisterField("_velocity", u_gf_NS);
@@ -481,9 +390,6 @@ int main(int argc, char *argv[]){
     // Operators for the integer-order problem (Id - dt * F)
     CSS css_IC(fespace, vector_size, true_block_offsets, u_gf_NS, chi_coeff, xi_coeff, dt_IC);
     PSS pss_IC(fespace, u_coeff, dt_IC);
-
-    // css_IC.set_theta(dt_IC); 
-    // pss_IC.set_beta(dt_IC); 
     
     int ti_IC = 0; 
     double t_IC = 0.0; 
@@ -492,10 +398,8 @@ int main(int argc, char *argv[]){
     for (int ti_IC = 0; !done_IC; ){
         
         for(int i = 0; i < vector_size; i++){
-            // phis_eta[i].Distribute(phi_eta_true_block.GetBlock(i)); 
             phis_psi[i].Distribute(phi_psi_true_block.GetBlock(i)); 
             phis_dt_I_alpha_psi[i].Distribute(phi_dt_I_alpha_psi_true_block.GetBlock(i)); 
-            // phis_Fpsi0[i].Distribute(phi_Fpsi0_true_block.GetBlock(i)); 
         }
 
         if(ti_IC % plot_frequency_IC == 0){
@@ -572,33 +476,12 @@ int main(int argc, char *argv[]){
         dxu2_gf->ProjectCoefficient(d1u2_coeff); 
         dyu2_gf->ProjectCoefficient(d2u2_coeff); 
         div_u_gf->ProjectCoefficient(div_u_coeff);
-        
-        // ORIGINAL VERSION       
-        // double prefactor = 0; 
-        // for (int k = 0; k < n_modes; k++){
-        //     prefactor += weights[k];  
-        //     prefactor -= 0.5 * dt * lambdas[k] * weights[k] * gammas[k]; 
-        // }
-        // prefactor += w_inf/dt; 
-        // // beta times dt 
-        // prefactor *= dt; 
-
-        // TEST VERSION 
-        // double prefactor = 0; 
-        // for (int k = 0; k < n_modes; k++){
-        //     prefactor -= dt * dt * lambdas[k] * weights[k] * gammas[k];
-        //     prefactor += dt * weights[k];  
-        // }
-        // prefactor += w_inf; 
-        
-        // PSI VERSION
+   
+        // create operators 
         CSS css(fespace, vector_size, true_block_offsets, u_gf_NS, chi_coeff, xi_coeff, get_beta(alpha,dt));
         PSS pss(fespace, u_coeff, get_beta(alpha,dt));
 
-        // dt^(1-alpha) psi = (I^\alpha psi^n+1 - I^\alpha psi^n)/dt 
-        // Accumulate for time step n
-        // I^\alpha psi^n = sum psi_k^n + w_inf psi^n 
-
+        // Accumulate fractional derivative of psi  
         phi_dt_I_alpha_psi_true_block = 0; 
         if (t < 1e-8) {} else {
             phi_dt_I_alpha_psi_true_block.Add( -1 * w_inf,phi_psi_true_block); 
@@ -610,12 +493,13 @@ int main(int argc, char *argv[]){
         tmp_block_vector = 0; 
         tmp2_block_vector = 0; 
 
-        // RHS - F(...) part 
+        // RHS - inside the operator 
         for (int k = 0; k < n_modes; k++){
             tmp_block_vector.Add(gammas[k], phi_psi_true_modes[k]); 
             tmp_block_vector.Add(- 1, phi_psi_true_modes[k]); 
         } 
         
+        // psi_inf(0) = 0 
         if (t < 1e-8) {} else {
             tmp_block_vector.Add( - w_inf, phi_psi_true_block);
         }
@@ -625,28 +509,23 @@ int main(int argc, char *argv[]){
             m_solver.Mult(tmp2_block_vector.GetBlock(i), tmp_block_vector.GetBlock(i));
         }
 
-        // RHS - rest 
+        // RHS - outside the operator  
         tmp_block_vector.Add(1.0, phi_psi_true_block); 
 
         // SOLVE  
         css.solve_Id_minus_theta_FR(tmp_block_vector, phi_psi_true_block); 
         
-        // mode updates 
-        for (int k = 0; k < n_modes; k++){
-            // phi_psi_true_modes[k].Add(dt * weights[k], phi_psi_true_block);  
-            // phi_psi_true_modes[k] *= gammas[k];  
-        }  
-
-        // psi^n+1 
-        // Calculate right side
+        
         tmp_block_vector = 0; 
         tmp2_block_vector = 0; 
 
+        // RHS - inside the operator 
         for (int k = 0; k < n_modes; k++){
             tmp_block_vector.Add(gammas[k], phi_psi_true_modes[k]); 
             tmp_block_vector.Add(- 1, phi_psi_true_modes[k]); 
         } 
 
+        // psi_inf(0) = 0 
         if (t < 1e-8) {} else {
             tmp_block_vector.Add( - w_inf, phi_psi_true_block);
         }
@@ -656,30 +535,27 @@ int main(int argc, char *argv[]){
             m_solver.Mult(tmp_vector, tmp_block_vector.GetBlock(i));
         }
 
+         // RHS - outside the operator  
         tmp_block_vector.Add(1.0, phi_psi_true_block); 
 
-        // solve for psi^n+1
+        // SOLVE 
         for(int i= 0; i < vector_size; i++){
             pss.solve_Id_minus_beta_Fx(tmp_block_vector.GetBlock(i), phi_psi_true_block.GetBlock(i));
         }
 
-        // mode updates 
+        // mode update 
         for (int k = 0; k < n_modes; k++){
             phi_psi_true_modes[k].Add(weights[k] * dt, phi_psi_true_block);  
             phi_psi_true_modes[k] *= gammas[k]; 
         }
 
-        // dt^(1-alpha) psi = (I^\alpha psi^n+1 - I^\alpha psi^n)/dt 
-        // Accumulate for time step n+1 
-        // I^\alpha psi^n+1 = sum psi_k^n+1 + w_inf psi^n+1 
+        // Accumulate fractional derivative of psi  
         phi_dt_I_alpha_psi_true_block.Add(w_inf, phi_psi_true_block); 
         for (int k = 0; k < n_modes; k++){
             phi_dt_I_alpha_psi_true_block += phi_psi_true_modes[k]; 
         }
         phi_dt_I_alpha_psi_true_block *= 1/dt; 
 
-        // phi_dt_I_alpha_psi_true_block = phi_psi_true_block; 
-        
         #if defined(prescribed_velocity)
             t += dt; 
         #endif 
@@ -693,10 +569,8 @@ int main(int argc, char *argv[]){
         // Load output 
 
         for(int i = 0; i < vector_size; i++){
-            // phis_eta[i].Distribute(phi_eta_true_block.GetBlock(i)); 
             phis_psi[i].Distribute(phi_psi_true_block.GetBlock(i)); 
             phis_dt_I_alpha_psi[i].Distribute(phi_dt_I_alpha_psi_true_block.GetBlock(i)); 
-            // phis_Fpsi0[i].Distribute(phi_Fpsi0_true_block.GetBlock(i)); 
         }        
         
         // Project coefficients on grid functions for the output
@@ -729,8 +603,8 @@ int main(int argc, char *argv[]){
     }
 
     // Free the used memory.
-    // delete pd;
-    // delete m_HPM; 
+    delete pd;
+    delete m_HPM; 
 
     auto stop = high_resolution_clock::now();
     auto duration = duration_cast<microseconds>(stop - start);
@@ -739,6 +613,8 @@ int main(int argc, char *argv[]){
         cout << "The simulation took " << duration.count()/1000000. << " seconds."<< endl;
     }
 
+
+    // print filename 
     cout << "PSI_" 
         + scenario
         + symmetry 

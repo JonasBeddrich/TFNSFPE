@@ -37,57 +37,6 @@ int main(int argc, char *argv[]){
 
     Mesh *mesh = new Mesh();
     load_mesh(mesh); 
-    // mesh = new Mesh(mesh_file);  
-
-    // // *mesh = Mesh::MakeCartesian2D(4, 4, Element::QUADRILATERAL);
-
-    // #if defined(Experiment1)
-    //     *mesh = Mesh::MakeCartesian2D(8, 8, Element::Type::QUADRILATERAL);
-    // #endif
-
-    // #if defined(Experiment2)
-    //     *mesh = Mesh::MakeCartesian2D(8, 8, Element::Type::QUADRILATERAL);
-    // #endif
-
-    // #if defined(Experiment3)
-    //     *mesh = Mesh::MakeCartesian2D(8, 8, Element::Type::QUADRILATERAL);
-    // #endif
-
-    // // #if defined(Experiment4)
-    // //     *mesh = Mesh::MakeCartesian2D(2, 2, Element::Type::QUADRILATERAL);
-    // // #endif
-
-    // #if defined(Experiment4_Medea)
-    //     *mesh = Mesh::MakeCartesian2D(2, 2, Element::Type::QUADRILATERAL);
-    // #endif
-
-    // #if defined(Experiment5_pres_u)
-    //     Mesh square = Mesh::MakeCartesian2D(10, 10, Element::QUADRILATERAL);
-    //     square.Save("Exp5_non_periodic.mesh");
-    //     Vector left_right_translation({1.0, 0.0});
-    //     std::vector<Vector> translations = {left_right_translation};
-    //     *mesh = Mesh::MakePeriodic(square, square.CreatePeriodicVertexMapping(translations));
-    //     mesh->RemoveInternalBoundaries();
-    //     mesh->Save("Exp5_periodic.mesh");
-    // #endif
-
-    // #if defined(Experiment5_pres_C)
-    //     Mesh square = Mesh::MakeCartesian2D(10, 10, Element::QUADRILATERAL);
-    //     square.Save("Exp5_non_periodic.mesh");
-    //     Vector left_right_translation({1.0, 0.0});
-    //     std::vector<Vector> translations = {left_right_translation};
-    //     *mesh = Mesh::MakePeriodic(square, square.CreatePeriodicVertexMapping(translations));
-    //     mesh->RemoveInternalBoundaries();
-    //     mesh->Save("Exp5_periodic.mesh");
-    // #endif
-
-    // #if defined(Experiment6)
-    //     mesh = new Mesh(mesh_file);
-    // #endif
-
-    // #if defined(Experiment7)
-    //     mesh = new Mesh(mesh_file);
-    // #endif
 
     auto *pmesh = new ParMesh(MPI_COMM_WORLD, *mesh);
     for (int i = 0; i < n_refine; i++){
