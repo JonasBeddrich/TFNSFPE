@@ -15,6 +15,7 @@
 #include <resources/experiment8.h>
 #include <resources/experiments.h>
 #include <resources/initialConditions.h>
+#include <resources/initialConditionsAnalyticalSolution.h>
 #include <resources/rational_approximation.h>
 #include <operators/finite_difference_scheme.h>
 #include <operators/PhysicalSpaceSolver.h>
@@ -113,7 +114,7 @@ int main(int argc, char *argv[]){
 
     // Needed to project the initial condition 
     ParGridFunction phi_psi0(&vfespace, phi_psi0_block.GetData());
-   
+    ParGridFunction phi_psi(&vfespace, phi_psi_block.GetData());
     NavierSolver flowsolver(pmesh, 2, nu);
     
     // Velocity initial conditions
@@ -125,6 +126,7 @@ int main(int argc, char *argv[]){
     VectorFunctionCoefficient phi_psiM_coeff(vector_size, phi_psiM_function);
     // phi_psiM.ProjectCoefficient(phi_psiM_coeff);
     phi_psi0.ProjectCoefficient(phi_psiM_coeff);
+    phi_psi.ProjectCoefficient(phi_psiM_coeff);
 
     // Create references to the single phis
     std::vector<ParGridFunction> phis_psi0(vector_size); 
@@ -326,15 +328,22 @@ int main(int argc, char *argv[]){
     std::vector<double> gammas = get_gammas(alpha, dt);
     double beta = get_beta(alpha, dt);
 
-    // ****************************************************************
-    // Rational Approximation to compute psi 
+    for(auto i: gammas){
+        cout << i << " "; 
+    }
+    cout << endl; 
 
-    std::vector<double> lambdas_psi = get_lambdas(1-alpha);
-    std::vector<double> weights_psi = get_weights(1-alpha);
-    double w_inf_psi = get_w_infinity(1-alpha);
+    for(auto i: weights){
+        cout << i << " "; 
+    }
+    cout << endl; 
 
-    std::vector<double> gammas_psi = get_gammas(1-alpha, dt);
-    double beta_psi = get_beta(1-alpha, dt);
+    for(auto i: lambdas){
+        cout << i << " "; 
+    }
+    cout << endl; 
+
+    cout << w_inf << endl; 
    
     // ****************************************************************
     // Setup of the simulation
@@ -446,6 +455,7 @@ int main(int argc, char *argv[]){
     // Calculate initial conditions - probability density  
 
     int ti_total = 0; 
+    phi_psi_true_block = phi_psi0_true_block; 
 
 #if defined(calculate_initial_condition)
 
@@ -530,6 +540,8 @@ int main(int argc, char *argv[]){
         cout << "" << endl; 
     }
 
+    phi_psi_true_block = phi_psi0_true_block; 
+
     pd->SetCycle(ti_total);
     pd->SetTime(t);
     pd->Save();
@@ -564,16 +576,29 @@ int main(int argc, char *argv[]){
         dyu2_gf->ProjectCoefficient(d2u2_coeff); 
         div_u_gf->ProjectCoefficient(div_u_coeff);
         
-        CSS css(fespace, vector_size, true_block_offsets, u_gf_NS, chi_coeff, xi_coeff, get_theta(alpha, dt));
-        PSS pss(fespace, u_coeff, get_beta(alpha, dt));
+        // ORIGINAL VERSION 
+        // CSS css(fespace, vector_size, true_block_offsets, u_gf_NS, chi_coeff, xi_coeff, get_theta(alpha, dt));
+        // PSS pss(fespace, u_coeff, get_beta(alpha, dt));
+        
+        // CORRECTED VERSION 
+        CSS css(fespace, vector_size, true_block_offsets, u_gf_NS, chi_coeff, xi_coeff, get_beta(alpha, dt));
+        PSS pss(fespace, u_coeff, get_beta(alpha, dt)); 
 
+        // cout << "theta: " << get_theta(alpha,dt); 
+        // cout << " / beta: " << get_beta(alpha,dt) << endl; 
+        
         // ****************************************************************
         // Solve the configuration space problem 
         
         // summation over modes and right-hand side 
         tmp_block_vector = phi_psi0_true_block; 
+        
         for (int l = 0; l < n_modes; l++){
-            tmp_block_vector.Add(1., phi_psi_true_modes[l]); 
+            // ORIGINAL VERSION 
+            // tmp_block_vector.Add(1., phi_psi_true_modes[l]); 
+            
+            // CORRECTED VERSION 
+            tmp_block_vector.Add(gammas[l], phi_psi_true_modes[l]); 
         }
 
         // solve for eta^n+0.5 
@@ -594,7 +619,8 @@ int main(int argc, char *argv[]){
         // Solve the physical space problem  
 
         // summation over modes and right-hand side 
-        tmp_block_vector = phi_psi0_true_block; 
+        tmp_block_vector = phi_psi0_true_block;
+
         for (int l = 0; l < n_modes; l++){
             tmp_block_vector.Add(gammas[l], phi_psi_true_modes[l]); 
         }
@@ -609,12 +635,13 @@ int main(int argc, char *argv[]){
             pss.apply_Fx(phi_psi_true_block.GetBlock(i), tmp_block_vector.GetBlock(i)); 
             m_solver.Mult(tmp_block_vector.GetBlock(i), phi_Fx_true_block.GetBlock(i));
         }
-       
+        
         // update modes 
         for (int l = 0; l < n_modes; l++){
             phi_psi_true_modes[l].Add(dt * weights[l], phi_Fx_true_block);
             phi_psi_true_modes[l] *= gammas[l];  
         }
+
         
         // ****************************************************************
         // Update time step and check if done 

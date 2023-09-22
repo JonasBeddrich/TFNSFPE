@@ -1,6 +1,10 @@
+#if !defined(ICanalytical)
+
 void phi_psiM_function(const Vector &x, Vector &y){
     int dim = x.Size(); 
     int vector_size = y.Size(); 
+
+    
 
     for (int i = 0; i < vector_size; i++){
         y(i) = 0; 
@@ -1534,10 +1538,6 @@ void phi_psiM_function(const Vector &x, Vector &y){
         y(2446) = -1.2367982469940028e-08;
         y(2448) = 9.178853423325096e-09;
     }
-
-    // for (int i = 0; i < vector_size; i++){
-    //     y(i) = 1; 
-    // }
-    // y(2) = 2; 
-
 }
+
+#endif 

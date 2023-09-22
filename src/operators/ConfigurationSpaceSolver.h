@@ -39,6 +39,7 @@ private:
     GridFunctionCoefficient *d1u1_coeff, *d1u2_coeff, *d2u1_coeff, *d2u2_coeff; 
     SumCoefficient *A11_coeff, *A12_coeff, *A21_coeff, *A22_coeff, *du_sym_coeff, *skew_12_coeff, *skew_21_coeff; 
     ProductCoefficient *a_a_2_chi_coeff; 
+    ConstantCoefficient *m0_coeff; 
 
     BiCGSTABSolver css_solver;
     BiCGSTABSolver A44_solver;
@@ -105,9 +106,9 @@ public:
             M_BO.SetBlock(i, i, &m_HPM); 
         }
     
-        ConstantCoefficient m0_coeff(0);
+        m0_coeff = new ConstantCoefficient(0);
         ParBilinearForm m0(&fespace);
-        m0.AddDomainIntegrator(new MassIntegrator(m0_coeff)); 
+        m0.AddDomainIntegrator(new MassIntegrator(*m0_coeff)); 
         m0.Assemble(); 
         m0.Finalize(); 
         m0_HPM = *(m0.ParallelAssemble()); 
@@ -134,7 +135,7 @@ public:
         A12_coeff = new SumCoefficient(0., *d2u1_coeff, 0.0, -1.0); 
         A21_coeff = new SumCoefficient(0., *d1u2_coeff, 0.0, -1.0); 
         A22_coeff = new SumCoefficient(xi_coeff, *d2u2_coeff, 1.0, -1.0); 
-        
+
         #if defined(symmetric)
             du_sym_coeff = new SumCoefficient(*d2u1_coeff, *d1u2_coeff, 0.5, 0.5); 
 
@@ -146,12 +147,12 @@ public:
             skew_12_coeff = new SumCoefficient(*d2u1_coeff, *d1u2_coeff, 0.5, -0.5); // d2u1-d1u2 (row 1 column 2)
             skew_21_coeff = new SumCoefficient(*d1u2_coeff, *d2u1_coeff, 0.5, -0.5); // d1u2-d2u1 (row 2 column 1)
 
-            A11_coeff = new SumCoefficient(xi_coeff, m0_coeff, 1.0, -1.0); 
+            A11_coeff = new SumCoefficient(xi_coeff, *m0_coeff, 1.0, -1.0); 
             A12_coeff = new SumCoefficient(0., *skew_12_coeff, 0.0, -1.0); 
             A21_coeff = new SumCoefficient(0., *skew_21_coeff, 0.0, -1.0); 
-            A22_coeff = new SumCoefficient(xi_coeff, m0_coeff, 1.0, -1.0); 
+            A22_coeff = new SumCoefficient(xi_coeff, *m0_coeff, 1.0, -1.0); 
         #endif
-
+        
         a_a_2_chi_coeff = new ProductCoefficient(2 * a * a, chi_coeff); 
     }
 
@@ -270,21 +271,15 @@ public:
         
         #if defined(symmetric)
             delete du_sym_coeff;
-            delete A12_coeff; 
-            delete A21_coeff;
         #endif
 
         #if defined(skew_symmetric)
             delete skew_12_coeff; 
             delete skew_21_coeff; 
-            delete A11_coeff; 
-            delete A12_coeff; 
-            delete A21_coeff; 
-            delete A22_coeff; 
         #endif
 
         delete a_a_2_chi_coeff; 
-
+        delete m0_coeff; 
     }
 
      void solve_Id_minus_theta_FR(BlockVector &y, BlockVector &x){

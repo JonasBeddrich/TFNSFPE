@@ -15,22 +15,22 @@ void u_IC(const Vector &x, double t, Vector &u){
 }
 #endif 
 
-#if defined(Experiment2)
-const std::string scenario = "Exp2_uneven"; 
-double t_final = 60;
-const int n_refine = 0; 
-bool prescribed_velocity = true; 
+// #if defined(Experiment2)
+// const std::string scenario = "Exp2_uneven"; 
+// double t_final = 60;
+// const int n_refine = 0; 
+// bool prescribed_velocity = true; 
 
-// xi and chi are set depening on psi ... thus not defined here 
-const double eps = 0.01; 
-const double nu = 0.; 
+// // xi and chi are set depening on psi ... thus not defined here 
+// const double eps = 0.01; 
+// const double nu = 0.; 
 
-void u_BC(const Vector &x, double t, Vector &u){}; 
-void u_IC(const Vector &x, double t, Vector &u){
-    u(0) = x(1) * (1-x(1)); 
-    u(1) = 0; 
-}
-#endif 
+// void u_BC(const Vector &x, double t, Vector &u){}; 
+// void u_IC(const Vector &x, double t, Vector &u){
+//     u(0) = x(1) * (1-x(1)); 
+//     u(1) = 0; 
+// }
+// #endif 
 
 // #if defined(Experiment3)
 // const std::string scenario = "testing"; 

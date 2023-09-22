@@ -3,13 +3,13 @@ using namespace mfem;
 
 // #define Experiment1
 // #define Experiment2
-#define Experiment3
+// #define Experiment3
 // #define Experiment4
 // #define Experiment4_Medea
 // #define Experiment5_pres_u
 // #define Experiment5_pres_C
 // #define Experiment6
-// #define Experiment7
+#define Experiment7
 // #define Experiment8
 
 /* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
