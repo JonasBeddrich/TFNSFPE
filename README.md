@@ -53,7 +53,7 @@ cd applications
 
 ## License
 
-Copyright (c) 2023 Stephan Lunowa
+Copyright (c) 2023 Jonas Beddrich
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
 documentation files (the “Software”), to deal in the Software without restriction, including without limitation the
