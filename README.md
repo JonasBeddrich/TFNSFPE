@@ -10,7 +10,6 @@ Core dependencies are:
 - [MFEM](https://mfem.org/) (4.5 or above)
 - [Hypre](https://computing.llnl.gov/projects/hypre-scalable-linear-solvers-multigrid-methods) (necessary for MFEM)
 - [Metis](http://glaros.dtc.umn.edu/gkhome/metis/metis/overview) (necessary for MFEM)
-- [GLVis](https://glvis.org/) (only necessary for real-time visualization in MFEM)
 
 See also [BUILD-MFEM.md](./BUILD-MFEM.md) on how to install the dependencies.
 
