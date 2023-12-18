@@ -13,6 +13,7 @@
 #include <resources/experiment4.h>
 #include <resources/experiment7.h>
 #include <resources/experiment8.h>
+#include <resources/experiment9.h>
 #include <resources/experiments.h>
 #include <resources/initialConditions.h>
 #include <resources/initialConditionsAnalyticalSolution.h>
@@ -41,6 +42,12 @@ int main(int argc, char *argv[]){
 
     Mesh *mesh = new Mesh();
     load_mesh(mesh); 
+
+    ofstream ofs("test.mesh");
+    ofs.precision(8);
+    mesh->Print(ofs);
+    cout << "mesh saved" << endl; 
+    ofs.close();
 
     auto *pmesh = new ParMesh(MPI_COMM_WORLD, *mesh);
     for (int i = 0; i < n_refine; i++){
@@ -254,7 +261,7 @@ int main(int argc, char *argv[]){
     ParGridFunction *p_gf_NS = flowsolver.GetCurrentPressure();
     VectorGridFunctionCoefficient u_coeff(u_gf_NS);
 
-    // Divergernce of u 
+    // Divergence of u 
     DivergenceGridFunctionCoefficient div_u_coeff(u_gf_NS);
     ParGridFunction *div_u_gf = new ParGridFunction(&fespace);
     div_u_gf->ProjectCoefficient(div_u_coeff);
@@ -267,19 +274,24 @@ int main(int argc, char *argv[]){
     #endif 
 
     // ****************************************************************
-    // Derivatives of u  
+    // Derivatives of u
+
     const FiniteElementCollection *u_fec = u_gf_NS->ParFESpace()->FEColl(); 
     ParFiniteElementSpace u_fes(pmesh, u_fec, 1); 
 
-    ParGridFunction *dxu1_gf = new ParGridFunction(&u_fes); 
-    ParGridFunction *dyu1_gf = new ParGridFunction(&u_fes); 
-    ParGridFunction *dxu2_gf = new ParGridFunction(&u_fes); 
-    ParGridFunction *dyu2_gf = new ParGridFunction(&u_fes); 
+    ParGridFunction *dxu1_gf = new ParGridFunction(u_gf_NS->ParFESpace()); 
+    ParGridFunction *dyu1_gf = new ParGridFunction(u_gf_NS->ParFESpace()); 
+    ParGridFunction *dxu2_gf = new ParGridFunction(u_gf_NS->ParFESpace()); 
+    ParGridFunction *dyu2_gf = new ParGridFunction(u_gf_NS->ParFESpace()); 
+
+    cout << "got till here" << endl; 
     
     u_gf_NS->GetDerivative(1,0,*dxu1_gf); 
     u_gf_NS->GetDerivative(1,1,*dyu1_gf); 
     u_gf_NS->GetDerivative(2,0,*dxu2_gf); 
     u_gf_NS->GetDerivative(2,1,*dyu2_gf); 
+
+    cout << "got till here" << endl; 
     
     GridFunctionCoefficient d1u1_coeff(dxu1_gf); 
     GridFunctionCoefficient d2u1_coeff(dyu1_gf); 
@@ -296,6 +308,8 @@ int main(int argc, char *argv[]){
     m.Finalize(); 
     HypreParMatrix *m_HPM = m.ParallelAssemble(); 
 
+
+
     BiCGSTABSolver m_solver(MPI_COMM_WORLD);
     m_solver.iterative_mode=false;
     m_solver.SetRelTol(1e-12);
@@ -303,6 +317,7 @@ int main(int argc, char *argv[]){
     m_solver.SetPrintLevel(0);
     m_solver.SetOperator(*m_HPM);
 
+    
     // ****************************************************************
     // Output
 

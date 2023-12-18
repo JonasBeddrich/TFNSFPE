@@ -59,13 +59,15 @@ message(STATUS "Mfem library is: ${MFEM_LIBRARIES}")
 # Consider all files in src/ for diffusion simulation.
 include_directories("src")
 file(GLOB_RECURSE PROJECT_HEADERS src/*.h)
-file(GLOB_RECURSE PROJECT_SOURCES src/*.cc)
+file(GLOB_RECURSE PSI_SOURCES src/psi_scheme.cc)
+file(GLOB_RECURSE dt_alpha_PSI_SOURCES src/dt_alpha_psi_scheme.cc)
 message(STATUS "Building diffusion simulation. Considering the follwing: \n" 
         "  .cc: ${PROJECT_SOURCES} \n" "  .h: ${PROJECT_HEADERS}")
 # define target executable for diffusion simulation
-add_executable(
-  ${CMAKE_PROJECT_NAME}
-  ${PROJECT_HEADERS} ${PROJECT_SOURCES}
-)
+add_executable("PSI" ${PROJECT_HEADERS} ${PSI_SOURCES})
+#add_executable("dt_alpha_PSI" ${PROJECT_HEADERS} ${dt_alpha_PSI_SOURCES})
+
 # Link executable against mfem
-target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ${MFEM_LIBRARIES} cnpy)
+target_link_libraries("PSI" PRIVATE ${MFEM_LIBRARIES} cnpy)
+#target_link_libraries("dt_alpha_PSI" PRIVATE ${MFEM_LIBRARIES} cnpy)
+
