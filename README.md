@@ -33,7 +33,8 @@ See also [BUILD-MFEM.md](./BUILD-MFEM.md) on how to install the dependencies.
 
 ## Usage
 
-Different experiments can be reproduced using the setting.h file. 
+Different experiments can be reproduced using the setting.h file, by inserting 
+e.g. #define experiment1
 
 
 Run the executable
