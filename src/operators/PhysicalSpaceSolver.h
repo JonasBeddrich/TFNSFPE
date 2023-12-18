@@ -68,10 +68,6 @@ public:
         beta(beta_), 
         pss_solver(MPI_COMM_WORLD){
         
-        // weights for rational approximation 
-        // beta = get_beta(alpha, dt); 
-        // gammas = get_gammas(alpha, dt); 
-        
         // mass matrix 
         m = new ParBilinearForm(&fespace);
         m->AddDomainIntegrator(new MassIntegrator); 
@@ -79,8 +75,6 @@ public:
         m->Finalize(); 
         m_HPM = m->ParallelAssemble(); 
  
-        // coefficients for the physical space operator 
-        // eps_coeff = new ConstantCoefficient(eps); 
         eps_coeff = new ConstantCoefficient(-1.0 * eps); 
 
         negative_coeff = new ConstantCoefficient(1.0); 
