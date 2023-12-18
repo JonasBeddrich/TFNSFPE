@@ -33,10 +33,13 @@ See also [BUILD-MFEM.md](./BUILD-MFEM.md) on how to install the dependencies.
 
 ## Usage
 
+Different experiments can be reproduced using the setting.h file. 
+
+
 Run the executable
 ```bash
 cd applications
-./PSI [<options>]
+./PSI 
 ```
 
 ## Authors and acknowledgment
