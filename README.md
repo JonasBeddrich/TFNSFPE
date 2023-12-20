@@ -11,8 +11,6 @@ Core dependencies are:
 - [Hypre](https://computing.llnl.gov/projects/hypre-scalable-linear-solvers-multigrid-methods) (necessary for MFEM)
 - [Metis](http://glaros.dtc.umn.edu/gkhome/metis/metis/overview) (necessary for MFEM)
 
-See also [BUILD-MFEM.md](./BUILD-MFEM.md) on how to install the dependencies.
-
 ## Build instructions
 1. Clone the repository
    ```bash
