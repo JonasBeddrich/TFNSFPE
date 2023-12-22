@@ -2,9 +2,9 @@ using namespace std;
 using namespace mfem;
 
 #if defined(Experiment9)
-const std::string scenario = "Exp9";
+const std::string scenario = "testingExp9parallel";
 
-const double alpha = 0.7; 
+const double alpha = 1; 
 const int n_modes = 20;             // rational approximation 
 const int N=3;                      // spectral method 
 const double a = 0.5;               // weighted hermite polynomials 
@@ -31,10 +31,10 @@ const double eps = 1.;
 const double scale_T = 1; 
 
 // SIMULATION 
-double t_final = 1;
+double t_final = 0.01;
 double dt = 0.001; 
 int n_plots = 20; 
-int plot_frequency = int(t_final / dt / n_plots); 
+int plot_frequency = 1; // int(t_final / dt / n_plots); 
 
 // CALCULATE INITIAL PROBABILITY DENSITY 
 // #define calculate_initial_condition

@@ -108,7 +108,7 @@ int main(int argc, char *argv[]){
     // true block vector for parallelization 
     BlockVector phi_psi_true_block(true_block_offsets); 
     BlockVector phi_psi0_true_block(true_block_offsets); 
-    BlockVector phi_dt_I_alpha_psi_true_block(block_offsets); 
+    BlockVector phi_dt_I_alpha_psi_true_block(true_block_offsets); 
 
     phi_psi_true_block = 0; 
     phi_psi0_true_block = 0; 
@@ -283,15 +283,11 @@ int main(int argc, char *argv[]){
     ParGridFunction *dyu1_gf = new ParGridFunction(u_gf_NS->ParFESpace()); 
     ParGridFunction *dxu2_gf = new ParGridFunction(u_gf_NS->ParFESpace()); 
     ParGridFunction *dyu2_gf = new ParGridFunction(u_gf_NS->ParFESpace()); 
-
-    cout << "got till here" << endl; 
     
     u_gf_NS->GetDerivative(1,0,*dxu1_gf); 
     u_gf_NS->GetDerivative(1,1,*dyu1_gf); 
     u_gf_NS->GetDerivative(2,0,*dxu2_gf); 
     u_gf_NS->GetDerivative(2,1,*dyu2_gf); 
-
-    cout << "got till here" << endl; 
     
     GridFunctionCoefficient d1u1_coeff(dxu1_gf); 
     GridFunctionCoefficient d2u1_coeff(dyu1_gf); 

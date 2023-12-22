@@ -59,6 +59,7 @@ public:
         chi_coeff(chi_coeff_), 
         xi_coeff(xi_coeff_), 
         css_solver(MPI_COMM_WORLD), 
+        A44_solver(MPI_COMM_WORLD), 
         M_BO(offsets_), 
         L_BO(offsets_), 
         A_BO(offsets_), 
