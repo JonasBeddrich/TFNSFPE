@@ -14,7 +14,7 @@ Core dependencies are:
 ## Build instructions
 1. Clone the repository
    ```bash
-   git clone https://gitlab.lrz.de/m2/mfem/tf-ns-fp-spherical.git
+   https://github.com/JonasBeddrich/TFNSFPE.git
    ```
 2. Create a build directory
    ```bash
