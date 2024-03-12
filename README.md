@@ -2,6 +2,10 @@
 
 Numerical solution of the time-fractional Navier--Stokes--Fokker--Planck equation based on the MFEM library.
 
+## Related references 
+
+Beddrich, Jonas, Endre Süli, and Barbara Wohlmuth. "Numerical simulation of the time-fractional Fokker–Planck equation and applications to polymeric fluids." Journal of Computational Physics 497 (2024): 112598.
+
 ## Project dependencies
 
 Core dependencies are:
