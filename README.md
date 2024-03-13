@@ -37,13 +37,10 @@ Core dependencies are:
 
 ## Usage
 
-Different experiments can be reproduced using the setting.h file, by inserting 
-e.g. #define experiment1
+Experiments from Beddrich et al. 2024 and further can be chosen in the setting.h file.
 
-
-Run the executable
+Run the executable (in build directory) 
 ```bash
-cd applications
 ./PSI 
 ```
 
@@ -53,11 +50,9 @@ cd applications
 - [Endre Süli]
 - [Barbara Wohlmuth]
 
-
 ### Developers
 
 - [Jonas Beddrich](mailto:jonas.beddrich@tum.de)
-
 
 ## License
 
