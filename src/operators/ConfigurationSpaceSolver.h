@@ -419,8 +419,6 @@ public:
                 }
             } 
 
-            
-            
             else { // counter > N+1 
                 Array<int> short_offsets(2*N -counter +1);
                 short_offsets[0] = 0; 
@@ -502,10 +500,8 @@ public:
                     x.GetBlock(z*N + k) = phi_k.GetBlock(i); 
                 }
             }
-
         }
         delete m_HPM; 
     }
-
 };
 

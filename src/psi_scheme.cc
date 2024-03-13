@@ -14,6 +14,7 @@
 #include <resources/experiment7.h>
 #include <resources/experiment8.h>
 #include <resources/experiment9.h>
+#include <resources/experiment10.h>
 #include <resources/experiments.h>
 #include <resources/initialConditions.h>
 #include <resources/initialConditionsAnalyticalSolution.h>
@@ -22,8 +23,8 @@
 #include <operators/PhysicalSpaceSolver.h>
 #include <operators/ConfigurationSpaceSolver.h>
 
-#include <../../mfem-4.5/miniapps/navier/navier_solver.hpp>
-#include <../../mfem-4.5/miniapps/navier/navier_solver.cpp>
+#include <../../mfem-4.6/miniapps/navier/navier_solver.hpp>
+#include <../../mfem-4.6/miniapps/navier/navier_solver.cpp>
 
 #include <chrono>
 
@@ -31,6 +32,13 @@ using namespace std;
 using namespace std::chrono;
 using namespace mfem;
 using namespace navier;
+
+void accel(const Vector &x, double t, Vector &f)
+{
+   f(0) = 1.0;
+   f(1) = 0.0;
+   f(2) = 0.0;
+}
 
 int main(int argc, char *argv[]){
     auto start = high_resolution_clock::now();
@@ -49,7 +57,14 @@ int main(int argc, char *argv[]){
     cout << "mesh saved" << endl; 
     ofs.close();
 
-    auto *pmesh = new ParMesh(MPI_COMM_WORLD, *mesh);
+    // Create translation vectors defining the periodicity
+    Vector x_translation({2.2, 0.0, 0.0});
+    std::vector<Vector> translations = {x_translation};
+
+    // Create the periodic mesh using the vertex mapping defined by the translation vectors
+    Mesh periodic_mesh = Mesh::MakePeriodic(*mesh, mesh->CreatePeriodicVertexMapping(translations));
+
+    auto *pmesh = new ParMesh(MPI_COMM_WORLD, periodic_mesh);
     for (int i = 0; i < n_refine; i++){
         pmesh->UniformRefinement();
     }
@@ -142,8 +157,8 @@ int main(int argc, char *argv[]){
     }
 
     for (int i = 0; i < vector_size; i++ ){
-        pd->RegisterField("phi_psi " + std::to_string(i), &phis_psi[i]);
-        pd->RegisterField("phi_dt_I_alpha_psi " + std::to_string(i), &phis_dt_I_alpha_psi[i]);
+        // pd->RegisterField("phi_psi " + std::to_string(i), &phis_psi[i]);
+        // pd->RegisterField("phi_dt_I_alpha_psi " + std::to_string(i), &phis_dt_I_alpha_psi[i]);
     }
 
     for (int i = 0; i < vector_size; i++ ){
@@ -206,7 +221,10 @@ int main(int argc, char *argv[]){
 
     Array<int> domain_attr(pmesh->attributes.Max());
     domain_attr = 1;
-    flowsolver.AddAccelTerm(T, domain_attr);
+    // flowsolver.AddAccelTerm(T, domain_attr);
+    // TODO: testing rough surface
+    flowsolver.AddAccelTerm(accel, domain_attr);
+
 
     GridFunctionCoefficient phi00_coeff(phi00);
     GridFunctionCoefficient phi02_coeff(phi02);
@@ -229,25 +247,25 @@ int main(int argc, char *argv[]){
     std::vector<double> gammas = get_gammas(alpha, dt);
     double w_inf = get_w_infinity(alpha);
 
-    cout << "gammas" << endl; 
-    for(auto i: gammas){
-        cout << i << " "; 
-    }
-    cout << endl; 
+    // cout << "gammas" << endl; 
+    // for(auto i: gammas){
+    //     cout << i << " "; 
+    // }
+    // cout << endl; 
 
-    cout << "weights" << endl; 
-    for(auto i: weights){
-        cout << i << " "; 
-    }
-    cout << endl; 
+    // cout << "weights" << endl; 
+    // for(auto i: weights){
+    //     cout << i << " "; 
+    // }
+    // cout << endl; 
 
-    cout << "lambdas" << endl; 
-    for(auto i: lambdas){
-        cout << i << " "; 
-    }
-    cout << endl; 
+    // cout << "lambdas" << endl; 
+    // for(auto i: lambdas){
+    //     cout << i << " "; 
+    // }
+    // cout << endl; 
 
-    cout << "w_inf: " << w_inf << endl; 
+    // cout << "w_inf: " << w_inf << endl; 
 
     // ****************************************************************
     // Prepare for simulation
@@ -304,15 +322,12 @@ int main(int argc, char *argv[]){
     m.Finalize(); 
     HypreParMatrix *m_HPM = m.ParallelAssemble(); 
 
-
-
     BiCGSTABSolver m_solver(MPI_COMM_WORLD);
     m_solver.iterative_mode=false;
     m_solver.SetRelTol(1e-12);
     m_solver.SetMaxIter(1000);
     m_solver.SetPrintLevel(0);
     m_solver.SetOperator(*m_HPM);
-
     
     // ****************************************************************
     // Output
@@ -342,18 +357,18 @@ int main(int argc, char *argv[]){
     pd->RegisterField("_velocity", u_gf_NS);
     pd->RegisterField("_pressure", p_gf_NS);
 
-    pd->RegisterField("_div_u", div_u_gf);
-    pd->RegisterField("dxu1", dxu1_gf);
-    pd->RegisterField("dyu1", dyu1_gf);
-    pd->RegisterField("dxu2", dxu2_gf);
-    pd->RegisterField("dyu2", dyu2_gf);
+    // pd->RegisterField("_div_u", div_u_gf);
+    // pd->RegisterField("dxu1", dxu1_gf);
+    // pd->RegisterField("dyu1", dyu1_gf);
+    // pd->RegisterField("dxu2", dxu2_gf);
+    // pd->RegisterField("dyu2", dyu2_gf);
     
-    pd->RegisterField("_chi", chi_gf);
-    pd->RegisterField("_T", T_gf);
+    // pd->RegisterField("_chi", chi_gf);
+    // pd->RegisterField("_T", T_gf);
 
-    pd->RegisterField("_C11", C11_gf);
-    pd->RegisterField("_C12", C12_gf);
-    pd->RegisterField("_C22", C22_gf);
+    // pd->RegisterField("_C11", C11_gf);
+    // pd->RegisterField("_C12", C12_gf);
+    // pd->RegisterField("_C22", C22_gf);
     
     // ****************************************************************
     // Calculate initial conditions - probability density  
@@ -462,8 +477,6 @@ int main(int argc, char *argv[]){
         cout << "" << endl; 
     }
     std::ofstream outstream;
-
-    ; 
     
     for (int ti = 0; !done; ){
         
@@ -476,96 +489,96 @@ int main(int argc, char *argv[]){
         #endif 
 
         // Calculate the derivatives of u for the output 
-        u_gf_NS->GetDerivative(1,0,*dxu1_gf); 
-        u_gf_NS->GetDerivative(1,1,*dyu1_gf); 
-        u_gf_NS->GetDerivative(2,0,*dxu2_gf); 
-        u_gf_NS->GetDerivative(2,1,*dyu2_gf); 
+        // u_gf_NS->GetDerivative(1,0,*dxu1_gf); 
+        // u_gf_NS->GetDerivative(1,1,*dyu1_gf); 
+        // u_gf_NS->GetDerivative(2,0,*dxu2_gf); 
+        // u_gf_NS->GetDerivative(2,1,*dyu2_gf); 
 
-        // Project coefficients on grid functions for the output
-        dxu1_gf->ProjectCoefficient(d1u1_coeff); 
-        dyu1_gf->ProjectCoefficient(d2u1_coeff); 
-        dxu2_gf->ProjectCoefficient(d1u2_coeff); 
-        dyu2_gf->ProjectCoefficient(d2u2_coeff); 
-        div_u_gf->ProjectCoefficient(div_u_coeff);
+        // // Project coefficients on grid functions for the output
+        // dxu1_gf->ProjectCoefficient(d1u1_coeff); 
+        // dyu1_gf->ProjectCoefficient(d2u1_coeff); 
+        // dxu2_gf->ProjectCoefficient(d1u2_coeff); 
+        // dyu2_gf->ProjectCoefficient(d2u2_coeff); 
+        // div_u_gf->ProjectCoefficient(div_u_coeff);
    
-        // create operators 
-        CSS css(fespace, vector_size, true_block_offsets, u_gf_NS, chi_coeff, xi_coeff, get_beta(alpha,dt));
-        PSS pss(fespace, u_coeff, get_beta(alpha,dt));
+        // // create operators 
+        // CSS css(fespace, vector_size, true_block_offsets, u_gf_NS, chi_coeff, xi_coeff, get_beta(alpha,dt));
+        // PSS pss(fespace, u_coeff, get_beta(alpha,dt));
 
-        // Accumulate fractional derivative of psi  
-        phi_dt_I_alpha_psi_true_block = 0; 
-        if (t < 1e-8) {} else {
-            phi_dt_I_alpha_psi_true_block.Add( -1 * w_inf,phi_psi_true_block); 
-            for (int k = 0; k < n_modes; k++){
-                phi_dt_I_alpha_psi_true_block.Add(-1, phi_psi_true_modes[k]); 
-            }
-        }
+        // // Accumulate fractional derivative of psi  
+        // phi_dt_I_alpha_psi_true_block = 0; 
+        // if (t < 1e-8) {} else {
+        //     phi_dt_I_alpha_psi_true_block.Add( -1 * w_inf,phi_psi_true_block); 
+        //     for (int k = 0; k < n_modes; k++){
+        //         phi_dt_I_alpha_psi_true_block.Add(-1, phi_psi_true_modes[k]); 
+        //     }
+        // }
                 
-        tmp_block_vector = 0; 
-        tmp2_block_vector = 0; 
+        // tmp_block_vector = 0; 
+        // tmp2_block_vector = 0; 
 
-        // RHS - inside the operator 
-        for (int k = 0; k < n_modes; k++){
-            tmp_block_vector.Add(gammas[k], phi_psi_true_modes[k]); 
-            tmp_block_vector.Add(- 1, phi_psi_true_modes[k]); 
-        } 
+        // // RHS - inside the operator 
+        // for (int k = 0; k < n_modes; k++){
+        //     tmp_block_vector.Add(gammas[k], phi_psi_true_modes[k]); 
+        //     tmp_block_vector.Add(- 1, phi_psi_true_modes[k]); 
+        // } 
         
-        // psi_inf(0) = 0 
-        if (t < 1e-8) {} else {
-            tmp_block_vector.Add( - w_inf, phi_psi_true_block);
-        }
+        // // psi_inf(0) = 0 
+        // if (t < 1e-8) {} else {
+        //     tmp_block_vector.Add( - w_inf, phi_psi_true_block);
+        // }
                 
-        css.apply_FR(tmp_block_vector, tmp2_block_vector);
-        for(int i=0; i < vector_size; i++){
-            m_solver.Mult(tmp2_block_vector.GetBlock(i), tmp_block_vector.GetBlock(i));
-        }
+        // css.apply_FR(tmp_block_vector, tmp2_block_vector);
+        // for(int i=0; i < vector_size; i++){
+        //     m_solver.Mult(tmp2_block_vector.GetBlock(i), tmp_block_vector.GetBlock(i));
+        // }
 
-        // RHS - outside the operator  
-        tmp_block_vector.Add(1.0, phi_psi_true_block); 
+        // // RHS - outside the operator  
+        // tmp_block_vector.Add(1.0, phi_psi_true_block); 
 
-        // SOLVE  
-        css.solve_Id_minus_theta_FR(tmp_block_vector, phi_psi_true_block); 
+        // // SOLVE  
+        // css.solve_Id_minus_theta_FR(tmp_block_vector, phi_psi_true_block); 
         
         
-        tmp_block_vector = 0; 
-        tmp2_block_vector = 0; 
+        // tmp_block_vector = 0; 
+        // tmp2_block_vector = 0; 
 
-        // RHS - inside the operator 
-        for (int k = 0; k < n_modes; k++){
-            tmp_block_vector.Add(gammas[k], phi_psi_true_modes[k]); 
-            tmp_block_vector.Add(- 1, phi_psi_true_modes[k]); 
-        } 
+        // // RHS - inside the operator 
+        // for (int k = 0; k < n_modes; k++){
+        //     tmp_block_vector.Add(gammas[k], phi_psi_true_modes[k]); 
+        //     tmp_block_vector.Add(- 1, phi_psi_true_modes[k]); 
+        // } 
 
-        // psi_inf(0) = 0 
-        if (t < 1e-8) {} else {
-            tmp_block_vector.Add( - w_inf, phi_psi_true_block);
-        }
+        // // psi_inf(0) = 0 
+        // if (t < 1e-8) {} else {
+        //     tmp_block_vector.Add( - w_inf, phi_psi_true_block);
+        // }
 
-        for(int i= 0; i < vector_size; i++){
-            pss.apply_Fx(tmp_block_vector.GetBlock(i), tmp_vector);
-            m_solver.Mult(tmp_vector, tmp_block_vector.GetBlock(i));
-        }
+        // for(int i= 0; i < vector_size; i++){
+        //     pss.apply_Fx(tmp_block_vector.GetBlock(i), tmp_vector);
+        //     m_solver.Mult(tmp_vector, tmp_block_vector.GetBlock(i));
+        // }
 
-         // RHS - outside the operator  
-        tmp_block_vector.Add(1.0, phi_psi_true_block); 
+        //  // RHS - outside the operator  
+        // tmp_block_vector.Add(1.0, phi_psi_true_block); 
 
-        // SOLVE 
-        for(int i= 0; i < vector_size; i++){
-            pss.solve_Id_minus_beta_Fx(tmp_block_vector.GetBlock(i), phi_psi_true_block.GetBlock(i));
-        }
+        // // SOLVE 
+        // for(int i= 0; i < vector_size; i++){
+        //     pss.solve_Id_minus_beta_Fx(tmp_block_vector.GetBlock(i), phi_psi_true_block.GetBlock(i));
+        // }
 
-        // mode update 
-        for (int k = 0; k < n_modes; k++){
-            phi_psi_true_modes[k].Add(weights[k] * dt, phi_psi_true_block);  
-            phi_psi_true_modes[k] *= gammas[k]; 
-        }
+        // // mode update 
+        // for (int k = 0; k < n_modes; k++){
+        //     phi_psi_true_modes[k].Add(weights[k] * dt, phi_psi_true_block);  
+        //     phi_psi_true_modes[k] *= gammas[k]; 
+        // }
 
-        // Accumulate fractional derivative of psi  
-        phi_dt_I_alpha_psi_true_block.Add(w_inf, phi_psi_true_block); 
-        for (int k = 0; k < n_modes; k++){
-            phi_dt_I_alpha_psi_true_block += phi_psi_true_modes[k]; 
-        }
-        phi_dt_I_alpha_psi_true_block *= 1/dt; 
+        // // Accumulate fractional derivative of psi  
+        // phi_dt_I_alpha_psi_true_block.Add(w_inf, phi_psi_true_block); 
+        // for (int k = 0; k < n_modes; k++){
+        //     phi_dt_I_alpha_psi_true_block += phi_psi_true_modes[k]; 
+        // }
+        // phi_dt_I_alpha_psi_true_block *= 1/dt; 
 
         #if defined(prescribed_velocity)
             t += dt; 
@@ -579,21 +592,21 @@ int main(int argc, char *argv[]){
         // ****************************************************************
         // Load output 
 
-        for(int i = 0; i < vector_size; i++){
-            phis_psi[i].Distribute(phi_psi_true_block.GetBlock(i)); 
-            phis_dt_I_alpha_psi[i].Distribute(phi_dt_I_alpha_psi_true_block.GetBlock(i)); 
-        }        
+        // for(int i = 0; i < vector_size; i++){
+        //     phis_psi[i].Distribute(phi_psi_true_block.GetBlock(i)); 
+        //     phis_dt_I_alpha_psi[i].Distribute(phi_dt_I_alpha_psi_true_block.GetBlock(i)); 
+        // }        
         
-        // Project coefficients on grid functions for the output
-        T_gf->ProjectCoefficient(*T);
-        chi_gf->ProjectCoefficient(chi_coeff);
-        xi_gf->ProjectCoefficient(xi_coeff);
-        C11_gf->ProjectCoefficient(*C11_coeff);
-        C12_gf->ProjectCoefficient(*C12_coeff);
-        C22_gf->ProjectCoefficient(*C22_coeff);
+        // // Project coefficients on grid functions for the output
+        // T_gf->ProjectCoefficient(*T);
+        // chi_gf->ProjectCoefficient(chi_coeff);
+        // xi_gf->ProjectCoefficient(xi_coeff);
+        // C11_gf->ProjectCoefficient(*C11_coeff);
+        // C12_gf->ProjectCoefficient(*C12_coeff);
+        // C22_gf->ProjectCoefficient(*C22_coeff);
 
-        div_u_gf->Distribute(div_u_gf->GetTrueDofs());         
-        T_gf->Distribute(T_gf->GetTrueDofs());         
+        // div_u_gf->Distribute(div_u_gf->GetTrueDofs());         
+        // T_gf->Distribute(T_gf->GetTrueDofs());         
         
         // Advance iteration counters and write output
         ti++;
@@ -623,7 +636,6 @@ int main(int argc, char *argv[]){
     if(verbose){
         cout << "The simulation took " << duration.count()/1000000. << " seconds."<< endl;
     }
-
 
     // print filename 
     cout << "PSI_" 
