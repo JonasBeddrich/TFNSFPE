@@ -2,6 +2,12 @@
 
 Numerical solution of the time-fractional Navier--Stokes--Fokker--Planck equation based on the MFEM library.
 
+## Related references 
+
+Beddrich, Jonas, Endre Süli, and Barbara Wohlmuth. "Numerical simulation of the time-fractional Fokker–Planck equation and applications to polymeric fluids." Journal of Computational Physics 497 (2024): 112598.
+
+[https://doi.org/10.1016/j.jcp.2023.112598]
+
 ## Project dependencies
 
 Core dependencies are:
@@ -14,7 +20,7 @@ Core dependencies are:
 ## Build instructions
 1. Clone the repository
    ```bash
-   git clone https://gitlab.lrz.de/m2/mfem/tf-ns-fp-spherical.git
+   https://github.com/JonasBeddrich/TFNSFPE.git
    ```
 2. Create a build directory
    ```bash
@@ -31,13 +37,10 @@ Core dependencies are:
 
 ## Usage
 
-Different experiments can be reproduced using the setting.h file, by inserting 
-e.g. #define experiment1
+Experiments from Beddrich et al. 2024 and further can be chosen in the setting.h file.
 
-
-Run the executable
+Run the executable (in build directory) 
 ```bash
-cd applications
 ./PSI 
 ```
 
@@ -47,11 +50,9 @@ cd applications
 - [Endre Süli]
 - [Barbara Wohlmuth]
 
-
 ### Developers
 
 - [Jonas Beddrich](mailto:jonas.beddrich@tum.de)
-
 
 ## License
 
